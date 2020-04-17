@@ -36,7 +36,7 @@ func Run(config *Config) error {
 		return err
 	}
 	addr := fmt.Sprintf(":%d", config.Port)
-	log.Printf("knockrd starting up on %s", addr)
+	log.Printf("[info] knockrd starting up on %s", addr)
 	return http.ListenAndServe(addr, middleware(mux))
 }
 
