@@ -3,3 +3,6 @@ build: cmd/knockrd/* *.go
 
 run: build
 	./cmd/knockrd/knockrd
+
+test:
+	go test -race ./...

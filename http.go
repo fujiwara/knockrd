@@ -57,7 +57,7 @@ func configure(config *Config) error {
 	}
 	middleware = realip.MustMiddleware(&realip.Config{
 		RealIPFrom:      ipfroms,
-		RealIPHeader:    realip.HeaderXForwardedFor,
+		RealIPHeader:    config.RealIPHeader,
 		RealIPRecursive: true,
 	})
 
