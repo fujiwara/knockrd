@@ -54,16 +54,17 @@ func wrap(h handler) func(http.ResponseWriter, *http.Request) {
 }
 
 // Run runs knockrd
-func Run(config *Config) error {
-	if err := configure(config); err != nil {
+func Run(conf *Config) error {
+	if err := configure(conf); err != nil {
 		return err
 	}
-	addr := fmt.Sprintf(":%d", config.Port)
+	addr := fmt.Sprintf(":%d", conf.Port)
 	log.Printf("[info] knockrd starting up on %s", addr)
 	return http.ListenAndServe(addr, middleware(mux))
 }
 
 func configure(conf *Config) error {
+	log.Println("[debug] configure")
 	var ipfroms []*net.IPNet
 	for _, cidr := range conf.RealIPFrom {
 		_, ipnet, err := net.ParseCIDR(cidr)

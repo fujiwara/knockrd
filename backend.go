@@ -1,6 +1,7 @@
 package knockrd
 
 import (
+	"context"
 	"log"
 	"strings"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/guregu/dynamo"
 )
+
+var Timeout = 30 * time.Second
 
 type Backend interface {
 	Set(string) error
@@ -28,6 +31,7 @@ type DynamoDBBackend struct {
 }
 
 func NewDynamoDBBackend(conf *Config) (Backend, error) {
+	log.Println("[debug] initialize dynamodb backend")
 	awsCfg := &aws.Config{
 		Region: aws.String(conf.AWS.Region),
 	}
@@ -36,13 +40,15 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 	}
 	db := dynamo.New(session.New(), awsCfg)
 	name := conf.TableName
-	if _, err := db.Table(conf.TableName).Describe().Run(); err != nil {
-		log.Printf("describe table %s failed, creating", name)
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	if _, err := db.Table(conf.TableName).Describe().RunWithContext(ctx); err != nil {
+		log.Printf("[info] describe table %s failed, creating", name)
 		// table not exists
-		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).Run(); err != nil {
+		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).RunWithContext(ctx); err != nil {
 			return nil, err
 		}
-		if err := db.Table(name).UpdateTTL("Expires", true).Run(); err != nil {
+		if err := db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -56,7 +62,9 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 func (d *DynamoDBBackend) Get(key string) (bool, error) {
 	table := d.db.Table(d.TableName)
 	var item Item
-	if err := table.Get("Key", key).One(&item); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	if err := table.Get("Key", key).OneWithContext(ctx, &item); err != nil {
 		if strings.Contains(err.Error(), "no item found") {
 			// expired or not found
 			err = nil
@@ -75,11 +83,15 @@ func (d *DynamoDBBackend) Set(key string) error {
 		Key:     key,
 		Expires: expires,
 	}
-	return table.Put(item).Run()
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	return table.Put(item).RunWithContext(ctx)
 }
 
 func (d *DynamoDBBackend) Delete(key string) error {
 	table := d.db.Table(d.TableName)
 	log.Printf("[debug] deleting %s", key)
-	return table.Delete("Key", key).Run()
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	return table.Delete("Key", key).RunWithContext(ctx)
 }
