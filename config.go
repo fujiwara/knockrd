@@ -1,6 +1,7 @@
 package knockrd
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/kayac/go-config"
@@ -12,6 +13,15 @@ const (
 	DefaultTable   = "knockrd"
 	DefaultExpires = 86400
 )
+
+var DefaultRealIPFrom = []string{
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"127.0.0.0/8",
+	"fe80::/10",
+	"::1/128",
+}
 
 type Config struct {
 	Port         int
@@ -31,6 +41,7 @@ func LoadConfig(path string) (*Config, error) {
 	c := Config{
 		Port:         DefaultPort,
 		TableName:    DefaultTable,
+		RealIPFrom:   DefaultRealIPFrom,
 		RealIPHeader: realip.HeaderXForwardedFor,
 		Expires:      DefaultExpires,
 		AWS: AWSConfig{
@@ -43,4 +54,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	err := config.LoadWithEnv(&c, path)
 	return &c, err
+}
+
+func (c *Config) String() string {
+	b, _ := json.Marshal(c)
+	return string(b)
 }

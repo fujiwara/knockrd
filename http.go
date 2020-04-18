@@ -12,19 +12,11 @@ import (
 )
 
 var (
-	mux         = http.NewServeMux()
-	middleware  func(http.Handler) http.Handler
-	backend     Backend
-	expires     int64
-	defaultCIDR = []string{
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"127.0.0.0/8",
-		"fe80::/10",
-		"::1/128",
-	}
-	tmpl = template.Must(template.New("form").Parse(`<!DOCTYPE html>
+	mux        = http.NewServeMux()
+	middleware func(http.Handler) http.Handler
+	backend    Backend
+	expires    int64
+	tmpl       = template.Must(template.New("form").Parse(`<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -73,13 +65,7 @@ func Run(config *Config) error {
 
 func configure(conf *Config) error {
 	var ipfroms []*net.IPNet
-	var realIPFrom []string
-	if len(conf.RealIPFrom) == 0 {
-		realIPFrom = defaultCIDR
-	} else {
-		realIPFrom = conf.RealIPFrom
-	}
-	for _, cidr := range realIPFrom {
+	for _, cidr := range conf.RealIPFrom {
 		_, ipnet, err := net.ParseCIDR(cidr)
 		if err != nil {
 			return err

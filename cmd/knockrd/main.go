@@ -15,5 +15,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("[debug]", cfg.String())
 	log.Fatal(knockrd.Run(cfg))
 }
