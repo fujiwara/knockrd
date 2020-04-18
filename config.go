@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	DefaultPort  = 9876
-	DefaultTable = "knockrd"
+	DefaultPort    = 9876
+	DefaultTable   = "knockrd"
+	DefaultExpires = 86400
 )
 
 type Config struct {
@@ -17,6 +18,7 @@ type Config struct {
 	TableName    string
 	RealIPFrom   []string
 	RealIPHeader string
+	Expires      int64
 	AWS          AWSConfig
 }
 
@@ -30,6 +32,7 @@ func LoadConfig(path string) (*Config, error) {
 		Port:         DefaultPort,
 		TableName:    DefaultTable,
 		RealIPHeader: realip.HeaderXForwardedFor,
+		Expires:      DefaultExpires,
 		AWS: AWSConfig{
 			Region:   os.Getenv("AWS_REGION"),
 			Endpoint: os.Getenv("AWS_ENDPOINT"),

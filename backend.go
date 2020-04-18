@@ -11,8 +11,9 @@ import (
 )
 
 type Backend interface {
-	Set(string, int64) error
+	Set(string) error
 	Get(string) (bool, error)
+	Delete(string) error
 }
 
 type Item struct {
@@ -23,19 +24,19 @@ type Item struct {
 type DynamoDBBackend struct {
 	db        *dynamo.DB
 	TableName string
-	Endpoint  string
+	Expires   int64
 }
 
-func NewDynamoDBBackend(name, region, endpoint string) (Backend, error) {
-	config := &aws.Config{
-		Region: aws.String(region),
+func NewDynamoDBBackend(conf *Config) (Backend, error) {
+	awsCfg := &aws.Config{
+		Region: aws.String(conf.AWS.Region),
 	}
-	if endpoint != "" {
-		config.Endpoint = aws.String(endpoint)
+	if conf.AWS.Endpoint != "" {
+		awsCfg.Endpoint = aws.String(conf.AWS.Endpoint)
 	}
-	db := dynamo.New(session.New(), config)
-
-	if _, err := db.Table(name).Describe().Run(); err != nil {
+	db := dynamo.New(session.New(), awsCfg)
+	name := conf.TableName
+	if _, err := db.Table(conf.TableName).Describe().Run(); err != nil {
 		log.Printf("describe table %s failed, creating", name)
 		// table not exists
 		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).Run(); err != nil {
@@ -48,6 +49,7 @@ func NewDynamoDBBackend(name, region, endpoint string) (Backend, error) {
 	return &DynamoDBBackend{
 		db:        db,
 		TableName: name,
+		Expires:   conf.Expires,
 	}, nil
 }
 
@@ -66,11 +68,18 @@ func (d *DynamoDBBackend) Get(key string) (bool, error) {
 	return ts <= item.Expires, nil
 }
 
-func (d *DynamoDBBackend) Set(key string, expires int64) error {
+func (d *DynamoDBBackend) Set(key string) error {
+	expires := time.Now().Unix() + d.Expires
 	table := d.db.Table(d.TableName)
 	item := Item{
 		Key:     key,
 		Expires: expires,
 	}
 	return table.Put(item).Run()
+}
+
+func (d *DynamoDBBackend) Delete(key string) error {
+	table := d.db.Table(d.TableName)
+	log.Printf("[debug] deleting %s", key)
+	return table.Delete("Key", key).Run()
 }
