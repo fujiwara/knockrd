@@ -96,6 +96,7 @@ func allowHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Cache-Control", "private")
 	ipaddr := r.Header.Get("X-Real-IP")
 	if ipaddr == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -110,7 +111,7 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err := tmpl.ExecuteTemplate(w, "form",
+	err = tmpl.ExecuteTemplate(w, "form",
 		struct {
 			IPAddr    string
 			CSRFToken string
@@ -125,6 +126,7 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Cache-Control", "private")
 	ipaddr := r.Header.Get("X-Real-IP")
 	token := r.FormValue("csrf_token")
 	if ipaddr == "" || token == "" {
@@ -178,7 +180,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) error {
 func csrfToken() (string, error) {
 	k := make([]byte, 32)
 	if _, err := crand.Read(k); err != nil {
-		return err
+		return "", err
 	}
 	return fmt.Sprintf("__%x", k), nil
 }
