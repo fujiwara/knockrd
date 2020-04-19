@@ -15,7 +15,6 @@ var (
 	mux        = http.NewServeMux()
 	middleware func(http.Handler) http.Handler
 	backend    Backend
-	expires    int64
 	tmpl       = template.Must(template.New("form").Parse(`<!DOCTYPE html>
 <html>
   <head>
@@ -103,7 +102,10 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 		fmt.Fprintln(w, "Bad request")
 		return nil
 	}
-	token := secureRandomString(32)
+	token, err := csrfToken()
+	if err != nil {
+		return err
+	}
 	if err := backend.Set(token); err != nil {
 		return err
 	}
@@ -173,10 +175,10 @@ func rootHandler(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func secureRandomString(b int) string {
-	k := make([]byte, b)
+func csrfToken() (string, error) {
+	k := make([]byte, 32)
 	if _, err := crand.Read(k); err != nil {
-		panic(err)
+		return err
 	}
-	return fmt.Sprintf("%x", k)
+	return fmt.Sprintf("__%x", k), nil
 }
