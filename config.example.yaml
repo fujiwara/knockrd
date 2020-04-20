@@ -1,3 +1,4 @@
-port: 1234
+port: 9876
 table_name: knockrd
-expires: 60
+ttl: 20s
+negative_ttl: 5s

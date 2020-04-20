@@ -80,7 +80,11 @@ func configure(conf *Config) error {
 	})
 
 	var err error
-	backend, err = NewDynamoDBBackend(conf)
+	if b, err := NewDynamoDBBackend(conf); err != nil {
+		return err
+	} else {
+		backend, err = NewCachedBackend(b, conf.TTL, conf.NegativeTTL)
+	}
 	return err
 }
 
