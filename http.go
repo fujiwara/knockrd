@@ -26,7 +26,8 @@ var (
 	<p>{{ .IPAddr }}</p>
 	<form method="POST">
 	  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-	  <input type="submit" value="Allow">
+	  <input type="submit" value="Allow" name="allow">
+	  <input type="submit" value="Disallow" name="disallow">
 	</form>
   </body>
 </html>
@@ -147,12 +148,21 @@ func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	log.Println("[debug] setting allowed IP address", ipaddr)
-	if err := backend.Set(ipaddr); err != nil {
-		return err
+	if r.FormValue("allow") != "" {
+		log.Println("[debug] setting allowed IP address", ipaddr)
+		if err := backend.Set(ipaddr); err != nil {
+			return err
+		}
+		log.Println("[info] set allowed IP address", ipaddr)
+		fmt.Fprintf(w, "Allowed from %s\n", ipaddr)
+	} else if r.FormValue("disallow") != "" {
+		log.Println("[debug] removing allowed IP address", ipaddr)
+		if err := backend.Delete(ipaddr); err != nil {
+			return err
+		}
+		log.Println("[info] remove allowed IP address", ipaddr)
+		fmt.Fprintf(w, "Disallowed from %s\n", ipaddr)
 	}
-	log.Println("[info] set allowed IP address", ipaddr)
-	fmt.Fprintf(w, "Allowed from %s\n", ipaddr)
 	return nil
 }
 
