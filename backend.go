@@ -108,6 +108,7 @@ type CachedBackend struct {
 func NewCachedBackend(backend Backend, defaultTTL, negativeTTL time.Duration) (Backend, error) {
 	c := ttlcache.NewCache()
 	c.SetTTL(defaultTTL)
+	c.SkipTtlExtensionOnHit(true)
 	log.Printf("[debug] new cached backend defaultTTL:%s negativeTTL:%s", defaultTTL, negativeTTL)
 	return &CachedBackend{
 		backend:     backend,
