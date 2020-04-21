@@ -7,15 +7,17 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 
+	"github.com/fujiwara/ridge"
 	"github.com/natureglobal/realip"
 )
 
 var (
-	mux        = http.NewServeMux()
-	middleware func(http.Handler) http.Handler
-	backend    Backend
-	tmpl       = template.Must(template.New("form").Parse(`<!DOCTYPE html>
+	mux     = http.NewServeMux()
+	backend Backend
+	tmpl    = template.Must(template.New("form").Parse(`<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -53,39 +55,57 @@ func wrap(h handler) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
+type lambdaHandler struct {
+	handler http.Handler
+}
+
+func (h lambdaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[debug] remote_addr:%s", r.RemoteAddr)
+	log.Printf("[debug] headers:%#v", r.Header)
+	r.RemoteAddr = "127.0.0.1:0"
+	h.handler.ServeHTTP(w, r)
+}
+
 // Run runs knockrd
 func Run(conf *Config) error {
-	if err := configure(conf); err != nil {
+	handler, err := configure(conf)
+	if err != nil {
 		return err
 	}
 	addr := fmt.Sprintf(":%d", conf.Port)
 	log.Printf("[info] knockrd starting up on %s", addr)
-	return http.ListenAndServe(addr, middleware(mux))
+	ridge.Run(addr, "/", handler)
+	return nil
 }
 
-func configure(conf *Config) error {
+func configure(conf *Config) (http.Handler, error) {
 	log.Println("[debug] configure")
 	var ipfroms []*net.IPNet
 	for _, cidr := range conf.RealIPFrom {
 		_, ipnet, err := net.ParseCIDR(cidr)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		ipfroms = append(ipfroms, ipnet)
 	}
-	middleware = realip.MustMiddleware(&realip.Config{
+	middleware := realip.MustMiddleware(&realip.Config{
 		RealIPFrom:      ipfroms,
 		RealIPHeader:    conf.RealIPHeader,
 		RealIPRecursive: true,
 	})
+	handler := middleware(mux)
+	if env := os.Getenv("AWS_EXECUTION_ENV"); strings.HasPrefix(env, "AWS_Lambda_go") {
+		log.Printf("[debug] configure for %s", env)
+		handler = lambdaHandler{handler}
+	}
 
 	var err error
 	if b, err := NewDynamoDBBackend(conf); err != nil {
-		return err
+		return nil, err
 	} else {
 		backend, err = NewCachedBackend(b, conf.TTL, conf.NegativeTTL)
 	}
-	return err
+	return handler, err
 }
 
 func allowHandler(w http.ResponseWriter, r *http.Request) error {
