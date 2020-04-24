@@ -17,8 +17,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:ma
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/fujiwara/ridge v0.2.0 h1:IwUwO8stzklMuP0vCYMfoGjGJ09c94lQFWPiSaMDOrk=
-github.com/fujiwara/ridge v0.2.0/go.mod h1:D3zwW7vLWnbyFW/bXJp6b830mT+pasaaaWUXzWkrLr4=
+github.com/deckarep/golang-set v1.7.1 h1:SCQV0S6gTtp6itiFrTqI+pfmJ4LN85S1YzhDf9rTHJQ=
+github.com/deckarep/golang-set v1.7.1/go.mod h1:93vsz/8Wt4joVM7c2AVqh+YRMiUSc14yDtF28KmMOgQ=
 github.com/fujiwara/ridge v0.2.1 h1:eTqkdCfYoUKqflUAGTeMzsexRSUyJ+ag6cztc5B+SzE=
 github.com/fujiwara/ridge v0.2.1/go.mod h1:D3zwW7vLWnbyFW/bXJp6b830mT+pasaaaWUXzWkrLr4=
 github.com/garyburd/redigo v1.6.0/go.mod h1:NR3MbYisc3/PwhQ00EMzDiPmrwpPxAn5GI05/YaO1SY=

@@ -100,20 +100,20 @@ func (d *DynamoDBBackend) Delete(key string) error {
 }
 
 type CachedBackend struct {
-	backend     Backend
-	cache       *ttlcache.Cache
-	negativeTTL time.Duration
+	backend Backend
+	cache   *ttlcache.Cache
+	ttl     time.Duration
 }
 
-func NewCachedBackend(backend Backend, defaultTTL, negativeTTL time.Duration) (Backend, error) {
+func NewCachedBackend(backend Backend, ttl time.Duration) (Backend, error) {
 	c := ttlcache.NewCache()
-	c.SetTTL(defaultTTL)
+	c.SetTTL(ttl)
 	c.SkipTtlExtensionOnHit(true)
-	log.Printf("[debug] new cached backend defaultTTL:%s negativeTTL:%s", defaultTTL, negativeTTL)
+	log.Printf("[debug] new cached backend TTL:%s", ttl)
 	return &CachedBackend{
-		backend:     backend,
-		cache:       c,
-		negativeTTL: negativeTTL,
+		backend: backend,
+		cache:   c,
+		ttl:     ttl,
 	}, nil
 }
 
@@ -144,7 +144,7 @@ func (b *CachedBackend) Get(key string) (bool, error) {
 	}
 
 	log.Printf("[debug] set %s to negative cache", key)
-	b.cache.SetWithTTL(key, nil, b.negativeTTL)
+	b.cache.SetWithTTL(key, nil, b.ttl)
 	return false, nil
 }
 
