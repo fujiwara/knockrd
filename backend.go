@@ -29,7 +29,7 @@ type Item struct {
 type DynamoDBBackend struct {
 	db        *dynamo.DB
 	TableName string
-	TTL       time.Duration
+	ttl       time.Duration
 }
 
 func NewDynamoDBBackend(conf *Config) (Backend, error) {
@@ -57,7 +57,7 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 	return &DynamoDBBackend{
 		db:        db,
 		TableName: name,
-		TTL:       conf.TTL,
+		ttl:       conf.TTL,
 	}, nil
 }
 
@@ -80,7 +80,7 @@ func (d *DynamoDBBackend) Get(key string) (bool, error) {
 }
 
 func (d *DynamoDBBackend) Set(key string) error {
-	expireAt := time.Now().Add(d.TTL)
+	expireAt := time.Now().Add(d.TTL())
 	table := d.db.Table(d.TableName)
 	item := Item{
 		Key:     key,
@@ -101,7 +101,7 @@ func (d *DynamoDBBackend) Delete(key string) error {
 }
 
 func (d *DynamoDBBackend) TTL() time.Duration {
-	return d.TTL
+	return d.ttl
 }
 
 type CachedBackend struct {
@@ -160,5 +160,5 @@ func (b *CachedBackend) Delete(key string) error {
 }
 
 func (b *CachedBackend) TTL() time.Duration {
-	return b.backend.TTL
+	return b.backend.TTL()
 }

@@ -1,0 +1,20 @@
+{
+    "Description": "Example of knockrd-{{ env `KNOCKRD_RUN` `http` }}",
+    "Environment": {
+        "Variables": {
+            "KNOCKRD_DEBUG": "{{ env `KNOCKRD_DEBUG` ``}}",
+            "KNOCKRD_CONFIG": "config.yaml",
+            "KNOCKRD_STREAM": "{{ env `KNOCKRD_RUN` `http` }}"
+        }
+    },
+    "FunctionName": "knockrd-{{ env `KNOCKRD_RUN` `http` }}",
+    "Handler": "knockrd",
+    "MemorySize": 128,
+    "Role": "arn:aws:iam::{{ must_env `AWS_ACCOUNT_ID` }}:role/knockrd_lambda",
+    "Runtime": "go1.x",
+    "Tags": {},
+    "Timeout": 5,
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    }
+}

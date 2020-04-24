@@ -17,12 +17,12 @@ var filter = &logutils.LevelFilter{
 }
 
 func main() {
-	var configFile string
-	var debug, stream bool
+	var configFile, run string
+	var debug bool
 
 	flag.StringVar(&configFile, "config", "", "config file name")
 	flag.BoolVar(&debug, "debug", false, "enable debug log")
-	flag.BoolVar(&stream, "stream", false, "run as dynamodb stream lambda function")
+	flag.StringVar(&run, "run", "http", "run mode. http or stream")
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := os.Getenv(strings.ToUpper("KNOCKRD_" + f.Name)); s != "" {
 			f.Value.Set(s)
@@ -39,6 +39,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("[debug]", cfg.String())
-	log.Fatal(knockrd.Run(cfg, stream))
+	log.Fatal(knockrd.Run(cfg, run == "stream"))
 }

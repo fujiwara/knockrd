@@ -5,10 +5,9 @@ knockrd: ../cmd/knockrd/*.go ../*.go ../go.*
 clean:
 	rm -f knockrd
 
-deploy-http: knockrd
-	lambroll --function function.http.json --log-level debug deploy
-	lambroll --function function.http.json logs --follow --format=short
+deploy/%: knockrd
+	KNOCKRD_RUN=$* lambroll --log-level debug deploy
+	$(MAKE) logs/$*
 
-deploy-stream: knockrd
-	lambroll --function function.stream.json --log-level debug deploy
-	lambroll --function function.stream.json logs --follow --format=short
+logs/%:
+	KNOCKRD_RUN=$* lambroll logs --follow --format=short
