@@ -12,11 +12,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 )
 
-var dummyIPAddress = map[string]string{
-	"IPV4": "192.0.2.1/32",
-	"IPV6": "2001:db8::1/128",
-}
-
 type streamer struct {
 	conf *Config
 	svc  *wafv2.WAFV2
@@ -118,17 +113,11 @@ func (s *streamer) updateIPSet(c IPSetConfig, events []ipSetEvent) error {
 			addrs.Remove(e.address)
 		}
 	}
-	if addrs.Cardinality() == 0 {
-		if ip, ok := dummyIPAddress[*res.IPSet.IPAddressVersion]; ok {
-			log.Printf("[info] Set a dummy IP address(%s defined by RFC5737) because empty set are not allowed", ip)
-			addrs.Add(ip)
-		}
-	}
 	log.Printf(
 		"[info] update ip-set id:%s name:%s scope:%s addresses:%s",
 		c.ID, c.Name, c.Scope, addrs.String(),
 	)
-	var updates []*string
+	updates := make([]*string, 0, addrs.Cardinality())
 	for _, ad := range addrs.ToSlice() {
 		updates = append(updates, aws.String(ad.(string)))
 	}
