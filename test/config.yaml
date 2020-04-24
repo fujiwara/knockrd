@@ -1,7 +1,7 @@
 port: 9876
 table_name: knockrd_test
 ttl: 5s
-negative_ttl: 2s
+cache_ttl: 3s
 aws:
     region: us-east-1
     endpoint: "http://localhost:8000"
