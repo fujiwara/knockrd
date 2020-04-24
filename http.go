@@ -41,6 +41,7 @@ type handler func(http.ResponseWriter, *http.Request) error
 func wrap(h handler) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("X-Frame-Options", "DENY")
+		w.Header().Set("Cache-Control", "private")
 		err := h(w, r)
 		if err != nil {
 			log.Println("[error]", err)
@@ -74,7 +75,6 @@ func allowHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
-	w.Header().Set("Cache-Control", "private")
 	ipaddr := r.Header.Get("X-Real-IP")
 	if ipaddr == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -104,7 +104,6 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
-	w.Header().Set("Cache-Control", "private")
 	ipaddr := r.Header.Get("X-Real-IP")
 	token := r.FormValue("csrf_token")
 	if ipaddr == "" || token == "" {
@@ -130,7 +129,7 @@ func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
 		if err := backend.Set(ipaddr); err != nil {
 			return err
 		}
-		log.Println("[info] set allowed IP address", ipaddr)
+		log.Println("[info] set allowed IP address for %s", ipaddr, backend.TTL())
 		fmt.Fprintf(w, "Allowed from %s for %s.\n", ipaddr, backend.TTL())
 	} else if r.FormValue("disallow") != "" {
 		log.Println("[debug] removing allowed IP address", ipaddr)
