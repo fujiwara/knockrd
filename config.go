@@ -74,7 +74,7 @@ func LoadConfig(path string) (*Config, error) {
 		return &c, nil
 	}
 	err := config.LoadWithEnv(&c, path)
-	if err != nil {
+	if err == nil {
 		log.Println("[debug]", c.String())
 	}
 	return &c, err
@@ -125,8 +125,8 @@ func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEve
 				c.CacheTTL,
 				c.TTL,
 			)
+			c.CacheTTL = c.TTL
 		}
-		c.CacheTTL = c.TTL
 		var err error
 		backend, err = NewCachedBackend(b, c.CacheTTL)
 		if err != nil {
