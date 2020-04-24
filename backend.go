@@ -18,6 +18,7 @@ type Backend interface {
 	Set(string) error
 	Get(string) (bool, error)
 	Delete(string) error
+	TTL() time.Duration
 }
 
 type Item struct {
@@ -99,6 +100,10 @@ func (d *DynamoDBBackend) Delete(key string) error {
 	return table.Delete("Key", key).RunWithContext(ctx)
 }
 
+func (d *DynamoDBBackend) TTL() time.Duration {
+	return d.TTL
+}
+
 type CachedBackend struct {
 	backend Backend
 	cache   *ttlcache.Cache
@@ -152,4 +157,8 @@ func (b *CachedBackend) Delete(key string) error {
 	log.Printf("[debug] delete %s from cache", key)
 	b.cache.Remove(key)
 	return b.backend.Delete(key)
+}
+
+func (b *CachedBackend) TTL() time.Duration {
+	return b.backend.TTL
 }
