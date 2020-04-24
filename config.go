@@ -74,6 +74,9 @@ func LoadConfig(path string) (*Config, error) {
 		return &c, nil
 	}
 	err := config.LoadWithEnv(&c, path)
+	if err != nil {
+		log.Println("[debug]", c.String())
+	}
 	return &c, err
 }
 

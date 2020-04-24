@@ -24,7 +24,6 @@ func init() {
 	}
 }
 func TestDynamoDBBackend(t *testing.T) {
-	t.Log(conf.String())
 	dynamo, err := knockrd.NewDynamoDBBackend(conf)
 	if err != nil {
 		t.Error(err)
