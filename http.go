@@ -40,6 +40,7 @@ type handler func(http.ResponseWriter, *http.Request) error
 
 func wrap(h handler) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("X-Frame-Options", "DENY")
 		err := h(w, r)
 		if err != nil {
 			log.Println("[error]", err)
