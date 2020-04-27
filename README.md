@@ -51,11 +51,12 @@ http {
    - This location must be protected by other methods like OAuth or etc.
 1. knockrd shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
-1. knockrd store the IP address to the backend(DynamoDB).
+1. knockrd store the IP address to the backend(DynamoDB) with TTL.
 1. The user accesses to other locations.
 1. Nginx auth_request directive requests to knockrd `/auth`.
 1. knockrd compares the IP address with the backend and returns 200 OK or 403 Forbidden.
 1. Nginx allows or denies the user's request based on the knockrd response.
+1. DynamoDB expires the item after TTL.
 
 ## Usage with AWS WAF v2 IP Set (serverless)
 
@@ -75,6 +76,7 @@ Prepare IP sets for AWF WAF v2.
 Prepare config.yaml for the IP sets.
 
 ```yaml
+table_name: knockrd  # DynamoDB table name
 ttl: 300s
 ip-set:
   v4:
@@ -91,10 +93,12 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
    - This location must be protected by other methods like OAuth or etc.
 1. knockrd-http shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
-1. knockrd-http store the IP address to the backend(DynamoDB).
-    - knockrd-stream updates IP set by events on a dynamodb stream.
+1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
+    - knockrd-stream adds IP set by events on the dynamodb stream.
 1. The user accesses to other locations.
 1. AWS WAF allows or denies the user's request based on the ip sets.
+1. DynamoDB expires the item after TTL.
+    - knockrd-stream deletes IP set by events on the stream.
 
 ## LICENSE
 
