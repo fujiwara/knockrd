@@ -39,5 +39,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	switch run {
+	case "run", "stream":
+	default:
+		log.Fatalf("invalid run mode %s", run)
+	}
 	log.Fatal(knockrd.Run(cfg, run == "stream"))
 }

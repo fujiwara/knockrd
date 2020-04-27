@@ -10,9 +10,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/guregu/dynamo"
+	"github.com/pkg/errors"
+	"github.com/shogo82148/go-retry"
 )
 
 var Timeout = 30 * time.Second
+
+var retryPolicy = retry.Policy{
+	MinDelay: 500 * time.Millisecond,
+	MaxDelay: 3 * time.Second,
+	MaxCount: 10,
+}
 
 type Backend interface {
 	Set(string) error
@@ -48,10 +56,12 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 		log.Printf("[info] describe table %s failed, creating", name)
 		// table not exists
 		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).RunWithContext(ctx); err != nil {
-			return nil, err
+			return nil, errors.Newf(err, "failed to create table %s", name)
 		}
-		if err := db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx); err != nil {
-			return nil, err
+		if err := retryPolicy.Do(ctx, func() error {
+			return db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx)
+		}); err != nil {
+			return nil, errors.Wrapf(err, "failed to set TTL for %s.Expires", name)
 		}
 	}
 	return &DynamoDBBackend{

@@ -4,7 +4,7 @@
         "Variables": {
             "KNOCKRD_DEBUG": "{{ env `KNOCKRD_DEBUG` ``}}",
             "KNOCKRD_CONFIG": "config.yaml",
-            "KNOCKRD_STREAM": "{{ env `KNOCKRD_RUN` `http` }}"
+            "KNOCKRD_RUN": "{{ env `KNOCKRD_RUN` `http` }}"
         }
     },
     "FunctionName": "knockrd-{{ env `KNOCKRD_RUN` `http` }}",
