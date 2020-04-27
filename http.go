@@ -129,7 +129,7 @@ func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
 		if err := backend.Set(ipaddr); err != nil {
 			return err
 		}
-		log.Println("[info] set allowed IP address for %s", ipaddr, backend.TTL())
+		log.Printf("[info] set allowed IP address for %s TTL %s", ipaddr, backend.TTL())
 		fmt.Fprintf(w, "Allowed from %s for %s.\n", ipaddr, backend.TTL())
 	} else if r.FormValue("disallow") != "" {
 		log.Println("[debug] removing allowed IP address", ipaddr)

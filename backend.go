@@ -56,7 +56,7 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 		log.Printf("[info] describe table %s failed, creating", name)
 		// table not exists
 		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).RunWithContext(ctx); err != nil {
-			return nil, errors.Newf(err, "failed to create table %s", name)
+			return nil, errors.Wrapf(err, "failed to create table %s", name)
 		}
 		if err := retryPolicy.Do(ctx, func() error {
 			return db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx)
