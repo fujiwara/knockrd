@@ -24,6 +24,8 @@ real_ip_from:
 
 knockrd works with nginx auth_request directive and Amazon DynamoDB.
 
+![](docs/knockrd-with-nginx.svg)
+
 Nginx example configuration.
 
 ```
