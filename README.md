@@ -24,8 +24,6 @@ real_ip_from:
 
 knockrd works with nginx auth_request directive and Amazon DynamoDB.
 
-![](docs/knockrd-with-nginx.svg)
-
 Nginx example configuration.
 
 ```
@@ -73,6 +71,8 @@ knockrd process must have IAM policies which allows actions as below.
 1. Nginx allows or denies the user's request based on the knockrd response.
 1. DynamoDB expires the item after TTL.
 
+![](docs/knockrd-with-nginx.svg)
+
 ## Usage with AWS WAF v2 IP Set (serverless)
 
 knockrd also works with AWS WAF v2, AWS Lambda and Amazon DynamoDB.
@@ -119,6 +119,8 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 1. AWS WAF allows or denies the user's request based on the ip sets.
 1. DynamoDB expires the item after TTL.
     - knockrd-stream deletes from IP set by events on the stream.
+
+![](docs/knockrd-with-serverless.svg)
 
 ## LICENSE
 
