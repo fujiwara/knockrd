@@ -22,6 +22,8 @@ real_ip_from:
 
 ## Usage with Nginx auth_request directive
 
+knockrd works with nginx auth_request directive and Amazon DynamoDB.
+
 Nginx example configuration.
 
 ```
@@ -45,6 +47,17 @@ http {
 }
 ```
 
+knockrd process must have IAM policies which allows actions as below.
+
+- dynamodb:DeleteItem
+- dynamodb:GetItem
+- dynamodb:PutItem
+- dynamodb:UpdateItem
+- dynamodb:DiscribeTable
+- dynamodb:DiscribeTimeToLive
+- dynamodb:CreateTable (* if a table in config is not exist)
+- dynamodb:UpdateTimeToLive (*)
+
 ### Authorization Flow
 
 1. A user accesses to `/allow`.
@@ -60,16 +73,21 @@ http {
 
 ## Usage with AWS WAF v2 IP Set (serverless)
 
+knockrd also works with AWS WAF v2, AWS Lambda and Amazon DynamoDB.
+
 Prepare an IAM Role for lambda functions. `arn:aws:iam::{your account ID}:role/knockrd_lambda`
 The role must have policies which allows actions as below.
 
 - wafv2:GetIPSet
 - wafv2:UpdateIPSet
+- dynamodb:DeleteItem
 - dynamodb:GetItem
 - dynamodb:PutItem
 - dynamodb:UpdateItem
-- dynamodb:CreateTable
-- dynamodb:UpdateTimeToLive
+- dynamodb:DiscribeTable
+- dynamodb:DiscribeTimeToLive
+- dynamodb:CreateTable (* if a table in config is not exist)
+- dynamodb:UpdateTimeToLive (*)
 
 Prepare IP sets for AWF WAF v2.
 
@@ -94,11 +112,11 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 1. knockrd-http shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
 1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
-    - knockrd-stream adds IP set by events on the dynamodb stream.
+    - knockrd-stream adds to IP set by events on the dynamodb stream.
 1. The user accesses to other locations.
 1. AWS WAF allows or denies the user's request based on the ip sets.
 1. DynamoDB expires the item after TTL.
-    - knockrd-stream deletes IP set by events on the stream.
+    - knockrd-stream deletes from IP set by events on the stream.
 
 ## LICENSE
 

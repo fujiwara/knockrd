@@ -1,4 +1,4 @@
-ttl: 60s
+ttl: 300s
 cache_ttl: 15s
 ip-set:
   v4:

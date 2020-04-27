@@ -52,16 +52,34 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 	name := conf.TableName
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
-	if _, err := db.Table(conf.TableName).Describe().RunWithContext(ctx); err != nil {
+	if _, err := db.Table(name).Describe().RunWithContext(ctx); err != nil {
 		log.Printf("[info] describe table %s failed, creating", name)
 		// table not exists
 		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).RunWithContext(ctx); err != nil {
 			return nil, errors.Wrapf(err, "failed to create table %s", name)
 		}
+		log.Printf("[info] enabling TTL for %s", name)
 		if err := retryPolicy.Do(ctx, func() error {
 			return db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx)
 		}); err != nil {
 			return nil, errors.Wrapf(err, "failed to set TTL for %s.Expires", name)
+		}
+	} else {
+		dt, err := db.Table(name).DescribeTTL().RunWithContext(ctx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to describe TTL for %s", name)
+		}
+		log.Printf("[debug] TTL for %s is %s", name, dt.Status)
+		switch dt.Status {
+		case dynamo.TTLEnabled, dynamo.TTLEnabling:
+			// ok
+		case dynamo.TTLDisabling:
+			log.Printf("[warn] TTL for %s is disabling now", name)
+		case dynamo.TTLDisabled:
+			log.Printf("[info] enabling TTL for %s", name)
+			if err := db.Table(name).UpdateTTL("Expires", true).RunWithContext(ctx); err != nil {
+				return nil, errors.Wrapf(err, "failed to set TTL for %s.Expires", name)
+			}
 		}
 	}
 	return &DynamoDBBackend{

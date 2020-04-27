@@ -40,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 	switch run {
-	case "run", "stream":
+	case "http", "stream":
 	default:
 		log.Fatalf("invalid run mode %s", run)
 	}
