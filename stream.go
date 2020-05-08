@@ -4,20 +4,27 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/url"
+	"path"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/wafv2"
 	mapset "github.com/deckarep/golang-set"
+	consul "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
+
+var DefaultConsulKVPath = "knockrd/allowed"
 
 type streamer struct {
 	conf *Config
 	svc  *wafv2.WAFV2
 }
 
-func newStreamHandler(conf *Config) func(context.Context, events.DynamoDBEvent) error {
+// NewStreamHandler creates a DynamoDB Stream handler function
+func NewStreamHandler(conf *Config) func(context.Context, events.DynamoDBEvent) error {
 	awsCfg := &aws.Config{
 		Region: aws.String(conf.AWS.Region),
 	}
@@ -44,6 +51,7 @@ func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) erro
 	for _, r := range event.Records {
 		key, ok := r.Change.Keys["Key"]
 		if !ok {
+			log.Printf("[warn] unkown key %v", r.Change.Keys)
 			continue
 		}
 		ip := net.ParseIP(key.String())
@@ -78,17 +86,24 @@ func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) erro
 			v6 = append(v6, ipSetEvent{ip.String() + "/128", add})
 		}
 	}
-	if err := s.updateIPSet(s.conf.IPSet.V4, v4); err != nil {
-		return err
+	if s.conf.IPSet != nil {
+		if err := s.updateIPSet(s.conf.IPSet.V4, v4); err != nil {
+			return err
+		}
+		if err := s.updateIPSet(s.conf.IPSet.V6, v6); err != nil {
+			return err
+		}
 	}
-	if err := s.updateIPSet(s.conf.IPSet.V6, v6); err != nil {
-		return err
+	if s.conf.Consul != nil {
+		if err := s.updateConsulKV(s.conf.Consul, v4, v6); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (s *streamer) updateIPSet(c IPSetConfig, events []ipSetEvent) error {
-	if c.ID == "" || len(events) == 0 {
+func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
+	if c == nil || c.ID == "" || len(events) == 0 {
 		return nil
 	}
 	res, err := s.svc.GetIPSet(&wafv2.GetIPSetInput{
@@ -129,4 +144,41 @@ func (s *streamer) updateIPSet(c IPSetConfig, events []ipSetEvent) error {
 		LockToken: lockToken,
 	})
 	return err
+}
+
+func (s *streamer) updateConsulKV(c *ConsulConfig, events ...[]ipSetEvent) error {
+	client, err := consul.NewClient(&consul.Config{
+		Address:    c.Address,
+		Scheme:     c.Scheme,
+		Datacenter: c.Datacenter,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to new consul client")
+	}
+	kv := client.KV()
+	kvPath := c.KVPath
+	if kvPath == "" {
+		kvPath = DefaultConsulKVPath
+	}
+	for _, evs := range events {
+		for _, ev := range evs {
+			key := path.Join(kvPath, url.PathEscape(ev.address))
+			if ev.add {
+				log.Printf("[info] put to consul key=%s", key)
+				p := consul.KVPair{
+					Key:   key,
+					Value: []byte(ev.address),
+				}
+				if _, err := kv.Put(&p, nil); err != nil {
+					return errors.Wrapf(err, "failed to put to consul key=%s", key)
+				}
+			} else {
+				log.Printf("[info] delete from consul key=%s", key)
+				if _, err = kv.Delete(key, nil); err != nil {
+					return errors.Wrapf(err, "failed to delete from consul key=%s", key)
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -5,3 +5,5 @@ cache_ttl: 3s
 aws:
     region: us-east-1
     endpoint: "http://localhost:8000"
+consul:
+    address: 127.0.0.1:8500
