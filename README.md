@@ -114,7 +114,7 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 1. knockrd-http shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
 1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
-    - knockrd-stream adds to AWS WAF IP Set by events on the dynamodb stream.
+    - knockrd-stream adds the address to AWS WAF IP Set by events on the dynamodb stream.
 1. The user accesses to other locations.
 1. AWS WAF allows or denies the user's request based on the ip sets.
 1. DynamoDB expires the item after TTL.
@@ -133,7 +133,7 @@ knockrd works with [Consul](https://www.consul.io/), AWS Lambda and Amazon Dynam
 1. knockrd shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
 1. knockrd store the IP address to the backend(DynamoDB) with TTL.
-    - knockrd-stream adds to Consul KV by events on the dynamodb stream.
+    - knockrd-stream adds the address to Consul KV by events on the dynamodb stream.
 1. [consul-template](https://github.com/hashicorp/consul-template) renders a configuration file for nginx with items in Consul KV.
 1. The user accesses to other locations.
 1. nginx allows or denies the user's request based on the configuration file.
