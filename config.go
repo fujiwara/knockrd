@@ -39,10 +39,18 @@ type Config struct {
 	TTL          time.Duration `yaml:"ttl"`
 	CacheTTL     time.Duration `yaml:"cache_ttl"`
 	AWS          AWSConfig     `yaml:"aws"`
-	IPSet        struct {
-		V4 IPSetConfig `yaml:"v4"`
-		V6 IPSetConfig `yaml:"v6"`
+	IPSet        *struct {
+		V4 *IPSetConfig `yaml:"v4"`
+		V6 *IPSetConfig `yaml:"v6"`
 	} `yaml:"ip-set"`
+	Consul *ConsulConfig
+}
+
+type ConsulConfig struct {
+	Address    string `yaml:"address"`
+	Scheme     string `yaml:"scheme"`
+	Datacenter string `yaml:"datacenter"`
+	KVPath     string `yaml:"kv_path"`
 }
 
 type AWSConfig struct {
@@ -112,7 +120,7 @@ func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEve
 		hh = lambdaHandler{hh}
 	}
 
-	sh := newStreamHandler(c)
+	sh := NewStreamHandler(c)
 
 	b, err := NewDynamoDBBackend(c)
 	if err != nil {

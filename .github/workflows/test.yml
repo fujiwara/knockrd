@@ -23,6 +23,10 @@ jobs:
       run: |
         docker run -d -p 8000:8000 amazon/dynamodb-local
 
+    - name: Start consul-agent
+      run: |
+        docker run -d -p 8500:8500 consul:1.7 agent -server -data-dir /tmp/data -bootstrap -client 0.0.0.0
+
     - name: Build & Test
       run: |
         make test
