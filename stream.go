@@ -44,6 +44,14 @@ func NewStreamHandler(conf *Config) func(context.Context, events.DynamoDBEvent) 
 type ipSetEvent struct {
 	address string
 	add     bool
+	v4      bool
+}
+
+func (e ipSetEvent) CIDR() string {
+	if e.v4 {
+		return e.address + "/32"
+	}
+	return e.address + "/128"
 }
 
 func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) error {
@@ -71,19 +79,18 @@ func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) erro
 				continue
 			}
 			log.Printf("[debug] IPV4 %s add %t", ip.String(), add)
-			v4 = append(v4, ipSetEvent{ipv4.String() + "/32", add})
+			v4 = append(v4, ipSetEvent{ipv4.String(), add, true})
 		} else {
 			switch r.EventName {
 			case "INSERT", "MODIFY":
 				add = true
 			case "REMOVE":
-				v6 = append(v6, ipSetEvent{ip.String() + "/128", false})
 			default:
 				log.Printf("[warn] unknown event %s", r.EventName)
 				continue
 			}
 			log.Printf("[debug] IPV6 %s add %t", ip.String(), add)
-			v6 = append(v6, ipSetEvent{ip.String() + "/128", add})
+			v6 = append(v6, ipSetEvent{ip.String(), add, false})
 		}
 	}
 	if s.conf.IPSet != nil {
@@ -123,9 +130,9 @@ func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
 	log.Printf("[debug] current addresses %s", addrs.String())
 	for _, e := range events {
 		if e.add {
-			addrs.Add(e.address)
+			addrs.Add(e.CIDR())
 		} else {
-			addrs.Remove(e.address)
+			addrs.Remove(e.CIDR())
 		}
 	}
 	log.Printf(
@@ -167,7 +174,7 @@ func (s *streamer) updateConsulKV(c *ConsulConfig, events ...[]ipSetEvent) error
 				log.Printf("[info] put to consul key=%s", key)
 				p := consul.KVPair{
 					Key:   key,
-					Value: []byte(ev.address),
+					Value: []byte(ev.CIDR()),
 				}
 				if _, err := kv.Put(&p, nil); err != nil {
 					return errors.Wrapf(err, "failed to put to consul key=%s", key)

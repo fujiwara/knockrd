@@ -75,7 +75,7 @@ knockrd process must have IAM policies which allows actions as below.
 
 ## Usage with AWS WAF v2 IP Set (serverless)
 
-knockrd also works with AWS WAF v2, AWS Lambda and Amazon DynamoDB.
+knockrd works with AWS WAF v2, AWS Lambda and Amazon DynamoDB.
 
 Prepare an IAM Role for lambda functions. `arn:aws:iam::{your account ID}:role/knockrd_lambda`
 The role must have policies which allows actions as below.
@@ -114,13 +114,50 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 1. knockrd-http shows HTML form to allow access from the user's IP address.
 1. The user pushes the "Allow" button.
 1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
-    - knockrd-stream adds to IP set by events on the dynamodb stream.
+    - knockrd-stream adds to AWS WAF IP Set by events on the dynamodb stream.
 1. The user accesses to other locations.
 1. AWS WAF allows or denies the user's request based on the ip sets.
 1. DynamoDB expires the item after TTL.
     - knockrd-stream deletes from IP set by events on the stream.
 
 ![](docs/knockrd-with-serverless.svg)
+
+## Usage with Consul and consul-template
+
+knockrd works with [Consul](https://www.consul.io/), AWS Lambda and Amazon DynamoDB.
+
+### Authorization Flow
+
+1. A user accesses to `/allow` provided by knockrd.
+   - This location must be protected by other methods like OAuth or etc.
+1. knockrd shows HTML form to allow access from the user's IP address.
+1. The user pushes the "Allow" button.
+1. knockrd store the IP address to the backend(DynamoDB) with TTL.
+    - knockrd-stream adds to Consul KV by events on the dynamodb stream.
+1. [consul-template](https://github.com/hashicorp/consul-template) renders a configuration file for nginx with items in Consul KV.
+1. The user accesses to other locations.
+1. nginx allows or denies the user's request based on the configuration file.
+1. DynamoDB expires the item after TTL.
+    - knockrd-stream deletes from Consul KV by events on the stream.
+1. consul-template] renders a configuration file.
+
+![](docs/knockrd-with-consul.svg)
+
+A example of consul-template's template and consul-template command for nginx.
+
+```ctmpl
+location / {
+  {{ range ls "knockrd/allowed" }}
+  allow {{ .Value }};{{ end }}
+  deny all;
+}
+```
+
+```console
+# consul-template -template "allowed.ctmpl:/etc/nginx/allowed.conf:service nginx reload"
+```
+
+consul-template renders a configuration file by the template when Key-Values are changed on Consul, and then reload nginx.
 
 ## LICENSE
 
