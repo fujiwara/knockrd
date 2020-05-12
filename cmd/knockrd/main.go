@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"github.com/fujiwara/knockrd"
 	"github.com/hashicorp/logutils"
 )
+
+const version = "0.0.2"
 
 var filter = &logutils.LevelFilter{
 	Levels:   []logutils.LogLevel{"debug", "info", "warn", "error"},
@@ -18,17 +21,23 @@ var filter = &logutils.LevelFilter{
 
 func main() {
 	var configFile, run string
-	var debug bool
+	var debug, showVersion bool
 
 	flag.StringVar(&configFile, "config", "", "config file name")
 	flag.BoolVar(&debug, "debug", false, "enable debug log")
 	flag.StringVar(&run, "run", "http", "run mode. http or stream")
+	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := os.Getenv(strings.ToUpper("KNOCKRD_" + f.Name)); s != "" {
 			f.Value.Set(s)
 		}
 	})
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println("knockrd version", version)
+		return
+	}
 
 	if debug {
 		filter.MinLevel = logutils.LogLevel("debug")
