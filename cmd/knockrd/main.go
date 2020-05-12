@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/logutils"
 )
 
-const version = "0.0.2"
+const version = "0.0.3"
 
 var filter = &logutils.LevelFilter{
 	Levels:   []logutils.LogLevel{"debug", "info", "warn", "error"},
