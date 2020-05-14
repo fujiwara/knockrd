@@ -53,7 +53,7 @@ func NewDynamoDBBackend(conf *Config) (Backend, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 	if _, err := db.Table(name).Describe().RunWithContext(ctx); err != nil {
-		log.Printf("[info] describe table %s failed, creating", name)
+		log.Printf("[info] describe table %s failed, creating: %s", name, err)
 		// table not exists
 		if err := db.CreateTable(name, Item{}).OnDemand(true).Stream(dynamo.KeysOnlyView).RunWithContext(ctx); err != nil {
 			return nil, errors.Wrapf(err, "failed to create table %s", name)
