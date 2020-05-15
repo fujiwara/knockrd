@@ -53,8 +53,8 @@ knockrd process must have IAM policies which allows actions as below.
 - dynamodb:GetItem
 - dynamodb:PutItem
 - dynamodb:UpdateItem
-- dynamodb:DescribeTable
-- dynamodb:DescribeTimeToLive
+- dynamodb:DiscribeTable
+- dynamodb:DiscribeTimeToLive
 - dynamodb:CreateTable (* if a table in config is not exist)
 - dynamodb:UpdateTimeToLive (*)
 
@@ -86,12 +86,8 @@ The role must have policies which allows actions as below.
 - dynamodb:GetItem
 - dynamodb:PutItem
 - dynamodb:UpdateItem
-- dynamodb:DescribeTable
-- dynamodb:DescribeTimeToLive
-- dynamodb:DescribeStream
-- dynamodb:GetRecords
-- dynamodb:GetShardIterator
-- dynamodb:ListStreams
+- dynamodb:DiscribeTable
+- dynamodb:DiscribeTimeToLive
 - dynamodb:CreateTable (* if a table in config is not exist)
 - dynamodb:UpdateTimeToLive (*)
 
