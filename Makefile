@@ -18,4 +18,4 @@ clean:
 	rm -f statik/*
 
 bump/patch:
-	gobump patch cmd/knockrd
+	gobump patch -w cmd/knockrd
