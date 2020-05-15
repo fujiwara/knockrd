@@ -1,16 +1,16 @@
-.PHONY: test run clean prepare
+.PHONY: test run clean statik
 
-prepare:
+statik: public/*
 	go get github.com/rakyll/statik
 	statik -src=./public
 
-build: prepare cmd/knockrd/* *.go
+build: cmd/knockrd/* *.go
 	cd cmd/knockrd && go build
 
 run: build
 	./cmd/knockrd/knockrd
 
-test: prepare
+test:
 	go clean -testcache
 	go test -v -race ./...
 
