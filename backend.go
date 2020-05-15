@@ -167,8 +167,8 @@ func (b *CachedBackend) Set(key string) error {
 }
 
 func (b *CachedBackend) Get(key string) (bool, error) {
-	log.Printf("[debug] get %s from cache", key)
 	if isCachable(key) {
+		log.Printf("[debug] get %s from cache", key)
 		if v, ok := b.cache.Get(key); ok {
 			log.Printf("[debug] hit %s in cache (negative=%t)", key, v == nil)
 			return v != nil, nil
@@ -193,8 +193,8 @@ func (b *CachedBackend) Get(key string) (bool, error) {
 }
 
 func (b *CachedBackend) Delete(key string) error {
-	log.Printf("[debug] delete %s from cache", key)
 	if isCachable(key) {
+		log.Printf("[debug] delete %s from cache", key)
 		b.cache.Remove(key)
 	}
 	return b.backend.Delete(key)
