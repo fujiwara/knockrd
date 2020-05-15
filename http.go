@@ -8,23 +8,40 @@ import (
 	"net/http"
 )
 
+type View struct {
+	IPAddr    string
+	CSRFToken string
+	Message   string
+}
+
 var (
 	mux     = http.NewServeMux()
 	backend Backend
-	tmpl    = template.Must(template.New("form").Parse(`<!DOCTYPE html>
+	tmpl    = template.Must(template.New("view").Parse(`<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>knockrd</title>
+	<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css">
   </head>
-  <body>
-	<h1>knockrd</h1>
-	<p>{{ .IPAddr }}</p>
-	<form method="POST">
-	  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-	  <input type="submit" value="Allow" name="allow">
-	  <input type="submit" value="Disallow" name="disallow">
-	</form>
+  <body style="padding: 1em;">
+    <div class="pure-g">
+      <div class="pure-u">
+		<h1>knockrd</h1>
+		<p>Your IP address <strong>{{ .IPAddr }}</strong> {{ .Message }}</p>
+		{{ if ne .CSRFToken "" }}
+        <form class="pure-form pure-form-stacked" method="POST">
+          <fieldset>
+            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+            <button type="submit" name="allow" value="allow" class="pure-button pure-button-primary">Allow</button>
+            <button type="submit" name="disallow" value="disallow" class="pure-button">Disallow</button>
+          </fieldset>
+		</form>
+		{{ end }}
+      </div>
+    </div>
   </body>
 </html>
 `))
@@ -88,19 +105,10 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 	if err := backend.Set(token); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	err = tmpl.ExecuteTemplate(w, "form",
-		struct {
-			IPAddr    string
-			CSRFToken string
-		}{
-			IPAddr:    ipaddr,
-			CSRFToken: token,
-		})
-	if err != nil {
-		return err
-	}
-	return nil
+	return render(w, View{
+		IPAddr:    ipaddr,
+		CSRFToken: token,
+	})
 }
 
 func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
@@ -124,22 +132,30 @@ func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	var message string
 	if r.FormValue("allow") != "" {
 		log.Println("[debug] setting allowed IP address", ipaddr)
 		if err := backend.Set(ipaddr); err != nil {
 			return err
 		}
 		log.Printf("[info] set allowed IP address for %s TTL %s", ipaddr, backend.TTL())
-		fmt.Fprintf(w, "Allowed from %s for %s.\n", ipaddr, backend.TTL())
+		message = fmt.Sprintf("is allowed for %s.", backend.TTL())
 	} else if r.FormValue("disallow") != "" {
 		log.Println("[debug] removing allowed IP address", ipaddr)
 		if err := backend.Delete(ipaddr); err != nil {
 			return err
 		}
 		log.Println("[info] remove allowed IP address", ipaddr)
-		fmt.Fprintf(w, "Disallowed from %s\n", ipaddr)
+		message = "is disallowed."
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "Bad request")
+		return nil
 	}
-	return nil
+	return render(w, View{
+		IPAddr:  ipaddr,
+		Message: message,
+	})
 }
 
 func authHandler(w http.ResponseWriter, r *http.Request) error {
@@ -158,9 +174,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) error {
-	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "knockrd alive from %s\n", r.Header.Get("X-Real-IP"))
-	return nil
+	return render(w, View{IPAddr: r.Header.Get("X-Real-IP")})
 }
 
 func csrfToken() (string, error) {
@@ -169,4 +183,9 @@ func csrfToken() (string, error) {
 		return "", err
 	}
 	return noCachePrefix + fmt.Sprintf("%x", k), nil
+}
+
+func render(w http.ResponseWriter, v View) error {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return tmpl.ExecuteTemplate(w, "view", v)
 }
