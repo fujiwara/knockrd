@@ -14,6 +14,8 @@ import (
 	"github.com/shogo82148/go-retry"
 )
 
+const noCachePrefix = "__"
+
 var Timeout = 30 * time.Second
 
 var retryPolicy = retry.Policy{
@@ -156,6 +158,9 @@ func (b *CachedBackend) Set(key string) error {
 		b.cache.Remove(key)
 		return err
 	}
+	if !isCachable(key) {
+		return nil
+	}
 	log.Printf("[debug] set %s to cache", key)
 	b.cache.Set(key, struct{}{})
 	return nil
@@ -163,30 +168,42 @@ func (b *CachedBackend) Set(key string) error {
 
 func (b *CachedBackend) Get(key string) (bool, error) {
 	log.Printf("[debug] get %s from cache", key)
-	if v, ok := b.cache.Get(key); ok {
-		log.Printf("[debug] hit %s in cache (negative=%t)", key, v == nil)
-		return v != nil, nil
+	if isCachable(key) {
+		if v, ok := b.cache.Get(key); ok {
+			log.Printf("[debug] hit %s in cache (negative=%t)", key, v == nil)
+			return v != nil, nil
+		}
+		log.Printf("[debug] miss %s in cache", key)
 	}
-	log.Printf("[debug] miss %s in cache", key)
 	if ok, err := b.backend.Get(key); err != nil {
 		return false, err
 	} else if ok {
-		log.Printf("[debug] set %s to cache", key)
-		b.cache.Set(key, struct{}{})
+		if isCachable(key) {
+			log.Printf("[debug] set %s to cache", key)
+			b.cache.Set(key, struct{}{})
+		}
 		return true, nil
 	}
 
-	log.Printf("[debug] set %s to negative cache", key)
-	b.cache.SetWithTTL(key, nil, b.ttl)
+	if isCachable(key) {
+		log.Printf("[debug] set %s to negative cache", key)
+		b.cache.SetWithTTL(key, nil, b.ttl)
+	}
 	return false, nil
 }
 
 func (b *CachedBackend) Delete(key string) error {
 	log.Printf("[debug] delete %s from cache", key)
-	b.cache.Remove(key)
+	if isCachable(key) {
+		b.cache.Remove(key)
+	}
 	return b.backend.Delete(key)
 }
 
 func (b *CachedBackend) TTL() time.Duration {
 	return b.backend.TTL()
+}
+
+func isCachable(key string) bool {
+	return !strings.HasPrefix(key, noCachePrefix)
 }

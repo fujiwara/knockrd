@@ -168,5 +168,5 @@ func csrfToken() (string, error) {
 	if _, err := crand.Read(k); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("__%x", k), nil
+	return noCachePrefix + fmt.Sprintf("%x", k), nil
 }

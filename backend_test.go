@@ -28,7 +28,15 @@ func TestDynamoDBBackend(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	testBackend(t, dynamo)
+	testBackend(t, dynamo, "")
+}
+
+func TestDynamoDBBackendNoCache(t *testing.T) {
+	dynamo, err := knockrd.NewDynamoDBBackend(conf)
+	if err != nil {
+		t.Error(err)
+	}
+	testBackend(t, dynamo, knockrd.NoCachePrefix)
 }
 
 func TestCachedBackend(t *testing.T) {
@@ -40,11 +48,23 @@ func TestCachedBackend(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	testBackend(t, cached)
+	testBackend(t, cached, "")
 }
 
-func testBackend(t *testing.T, b knockrd.Backend) {
-	key := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%v%v", t, b))))
+func TestCachedBackendNoCache(t *testing.T) {
+	dynamo, err := knockrd.NewDynamoDBBackend(conf)
+	if err != nil {
+		t.Error(err)
+	}
+	cached, err := knockrd.NewCachedBackend(dynamo, conf.CacheTTL)
+	if err != nil {
+		t.Error(err)
+	}
+	testBackend(t, cached, knockrd.NoCachePrefix)
+}
+
+func testBackend(t *testing.T, b knockrd.Backend, prefix string) {
+	key := prefix + fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%v%v", t, b))))
 	for _ = range []int{0, 1} {
 		if ok, err := b.Get(key); err != nil {
 			t.Error(err)
