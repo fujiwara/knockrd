@@ -6,6 +6,9 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+
+	_ "github.com/fujiwara/knockrd/statik"
+	"github.com/rakyll/statik/fs"
 )
 
 type View struct {
@@ -24,7 +27,7 @@ var (
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>knockrd</title>
-	<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css">
+	<link rel="stylesheet" href="/public/css/pure-min.css">
   </head>
   <body style="padding: 1em;">
     <div class="pure-g">
@@ -48,9 +51,14 @@ var (
 )
 
 func init() {
+	statikFS, err := fs.New()
+	if err != nil {
+		panic(err)
+	}
 	mux.HandleFunc("/", wrap(rootHandler))
 	mux.HandleFunc("/allow", wrap(allowHandler))
 	mux.HandleFunc("/auth", wrap(authHandler))
+	mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(statikFS)))
 }
 
 type handler func(http.ResponseWriter, *http.Request) error
