@@ -16,3 +16,6 @@ test: prepare
 
 clean:
 	rm -f statik/*
+
+bump/patch:
+	gobump patch cmd/knockrd
