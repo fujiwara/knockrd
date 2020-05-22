@@ -159,6 +159,36 @@ location / {
 
 consul-template renders a configuration file by the template when Key-Values are changed on Consul, and then reload nginx.
 
+## Configuration
+
+```yaml
+port: 9876   # listen port for knockrd
+table_name: mytable_for_knockrd # DynamoDB table name
+real_ip_from:
+  - 192.168.0.0/16   # list of trusted CIDR to accept real_ip_header
+real_ip_header: X-Forwarded-For # header whose value will be used to replace the client address
+real_ip_from_cloudfront: true # append CloudFront CIDRs to real_ip_from by https://ip-ranges.amazonaws.com/ip-ranges.json
+ttl: Time to live to allow IP address
+cache_ttl: TTL for knockrd in memory cache for allowed IP addresses
+aws:
+  region: us-east-1  # AWS region of DynamoDB & Regional WAFv2 IP Set
+  endpoint:          # AWS endpoints for debug
+ip_set:
+  v4:
+    id: xxxx        # ID of WAFv2 IP Set for IPv4
+    name: foo       # Name of WAFv2 IP Set
+    scope: REGIONAL # Scope of WAFv2 IP Set (REGIONAL or CLOUDFRONT)
+  v6:
+    id: xxxx        # ID of WAFv2 IP Set for IPv6
+    name: foo       # Name of WAFv2 IP Set
+    scope: REGIONAL # Scope of WAFv2 IP Set (REGIONAL or CLOUDFRONT)
+cousul:
+  address: 127.0.0.1:8500 # address of Consul agnet
+  scheme: http            # scheme for access to consul agent
+```
+
+See default values for configuration at [Constants/Variables](https://godoc.org/github.com/fujiwara/knockrd#pkg-constants).
+
 ## LICENSE
 
 MIT License
