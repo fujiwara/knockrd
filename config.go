@@ -32,14 +32,15 @@ var DefaultRealIPFrom = []string{
 }
 
 type Config struct {
-	Port         int           `yaml:"port"`
-	TableName    string        `yaml:"table_name"`
-	RealIPFrom   []string      `yaml:"real_ip_from"`
-	RealIPHeader string        `yaml:"real_ip_header"`
-	TTL          time.Duration `yaml:"ttl"`
-	CacheTTL     time.Duration `yaml:"cache_ttl"`
-	AWS          AWSConfig     `yaml:"aws"`
-	IPSet        *struct {
+	Port                 int           `yaml:"port"`
+	TableName            string        `yaml:"table_name"`
+	RealIPFrom           []string      `yaml:"real_ip_from"`
+	RealIPFromCloudFront bool          `yaml:"real_ip_from_cloudfront"`
+	RealIPHeader         string        `yaml:"real_ip_header"`
+	TTL                  time.Duration `yaml:"ttl"`
+	CacheTTL             time.Duration `yaml:"cache_ttl"`
+	AWS                  AWSConfig     `yaml:"aws"`
+	IPSet                *struct {
 		V4 *IPSetConfig `yaml:"v4"`
 		V6 *IPSetConfig `yaml:"v6"`
 	} `yaml:"ip-set"`
@@ -81,11 +82,19 @@ func LoadConfig(path string) (*Config, error) {
 	if path == "" {
 		return &c, nil
 	}
-	err := config.LoadWithEnv(&c, path)
-	if err == nil {
-		log.Println("[debug]", c.String())
+	if err := config.LoadWithEnv(&c, path); err != nil {
+		return nil, err
 	}
-	return &c, err
+
+	if c.RealIPFromCloudFront {
+		cirds, err := fetchCloudFrontCIRDs()
+		if err != nil {
+			return nil, err
+		}
+		c.RealIPFrom = append(c.RealIPFrom, cirds...)
+	}
+	log.Println("[debug]", c.String())
+	return &c, nil
 }
 
 func (c *Config) String() string {
