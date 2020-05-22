@@ -2,6 +2,7 @@ package knockrd
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/url"
@@ -19,23 +20,28 @@ import (
 var DefaultConsulKVPath = "knockrd/allowed"
 
 type streamer struct {
-	conf *Config
-	svc  *wafv2.WAFV2
+	conf        *Config
+	svcRegional *wafv2.WAFV2
+	svcCF       *wafv2.WAFV2
 }
 
 // NewStreamHandler creates a DynamoDB Stream handler function
 func NewStreamHandler(conf *Config) func(context.Context, events.DynamoDBEvent) error {
-	awsCfg := &aws.Config{
+	awsCfgRegional := &aws.Config{
 		Region: aws.String(conf.AWS.Region),
 	}
-	if conf.AWS.Endpoint != "" {
-		awsCfg.Endpoint = aws.String(conf.AWS.Endpoint)
+	awsCfgCF := &aws.Config{
+		Region: aws.String("us-east-1"), // for CloudFront
 	}
-	svc := wafv2.New(session.New(), awsCfg)
+	if conf.AWS.Endpoint != "" {
+		awsCfgRegional.Endpoint = aws.String(conf.AWS.Endpoint)
+		awsCfgCF.Endpoint = aws.String(conf.AWS.Endpoint)
+	}
 
 	s := &streamer{
-		conf: conf,
-		svc:  svc,
+		conf:        conf,
+		svcRegional: wafv2.New(session.New(), awsCfgRegional),
+		svcCF:       wafv2.New(session.New(), awsCfgCF),
 	}
 
 	return s.Handler
@@ -113,7 +119,17 @@ func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
 	if c == nil || c.ID == "" || len(events) == 0 {
 		return nil
 	}
-	res, err := s.svc.GetIPSet(&wafv2.GetIPSetInput{
+	var svc *wafv2.WAFV2
+	switch c.Scope {
+	case "REGIONAL":
+		svc = s.svcRegional
+	case "CLOUDFRONT":
+		svc = s.svcCF
+	default:
+		return fmt.Errorf("invalid scope %s: Set REGIONAL or CLOUDFRONT", c.Scope)
+	}
+
+	res, err := svc.GetIPSet(&wafv2.GetIPSetInput{
 		Name:  &c.Name,
 		Id:    &c.ID,
 		Scope: &c.Scope,
@@ -124,14 +140,16 @@ func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
 	lockToken := res.LockToken
 	addrs := mapset.NewSet()
 	for _, ad := range res.IPSet.Addresses {
-		ad := ad
-		addrs.Add(*ad)
+		_, ipnet, _ := net.ParseCIDR(*ad)
+		addrs.Add(ipnet.String())
 	}
 	log.Printf("[debug] current addresses %s", addrs.String())
 	for _, e := range events {
 		if e.add {
+			log.Printf("[debug] add address %s", e.CIDR())
 			addrs.Add(e.CIDR())
 		} else {
+			log.Printf("[debug] remove address %s", e.CIDR())
 			addrs.Remove(e.CIDR())
 		}
 	}
@@ -143,7 +161,7 @@ func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
 	for _, ad := range addrs.ToSlice() {
 		updates = append(updates, aws.String(ad.(string)))
 	}
-	_, err = s.svc.UpdateIPSet(&wafv2.UpdateIPSetInput{
+	_, err = svc.UpdateIPSet(&wafv2.UpdateIPSetInput{
 		Name:      &c.Name,
 		Id:        &c.ID,
 		Scope:     &c.Scope,
