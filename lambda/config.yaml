@@ -2,6 +2,11 @@ ttl: 300s
 cache_ttl: 15s
 ip-set:
   v4:
-    id: ddcdf8ad-251c-4c8f-b12f-05628b87beb6
-    name: knockrd
-    scope: REGIONAL
+    id: 198d1f8f-7d12-4c7c-bc1e-d56188d94a9c
+    name: knockrd-cf-v4
+    scope: CLOUDFRONT
+  v6:
+    id: a68d3120-445b-49bb-bc82-286030e96819
+    name: knockrd-cf-v6
+    scope: CLOUDFRONT
+real_ip_from_cloudfront: true
