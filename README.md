@@ -15,9 +15,7 @@ Usage of knockrd:
 ```yaml
 port: 9876
 table_name: knockrd  # DynamoDB table name
-ttl: 300             # Expiration(sec) for allowed access
-real_ip_from:
-  - 10.0.0.0/8
+ttl: 3600s           # Expiration time for allowed access
 ```
 
 ## Usage with Nginx auth_request directive
