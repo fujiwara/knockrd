@@ -1,4 +1,4 @@
 port: 9876
 table_name: knockrd
-ttl: 20s
+ttl: 300s
 negative_ttl: 5s
