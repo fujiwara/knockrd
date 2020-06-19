@@ -214,6 +214,7 @@ consul-template renders a configuration file by the template when Key-Values are
 
 ```yaml
 port: 9876   # listen port for knockrd
+proxy_protocol: true # enable PROXY protocol (default false)
 table_name: mytable_for_knockrd # DynamoDB table name
 real_ip_from:
   - 192.168.0.0/16   # list of trusted CIDR to accept real_ip_header

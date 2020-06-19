@@ -21,6 +21,7 @@ func Run(conf *Config, stream bool) error {
 	}
 	addr := fmt.Sprintf(":%d", conf.Port)
 	log.Printf("[info] knockrd starting up on %s", addr)
+	ridge.ProxyProtocol = conf.ProxyProtocol
 	ridge.Run(addr, "/", hh)
 	return nil
 }

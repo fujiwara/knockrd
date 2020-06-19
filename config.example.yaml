@@ -1,4 +1,5 @@
 port: 9876
+proxy_protocol: true
 table_name: knockrd
 ttl: 300s
 negative_ttl: 5s

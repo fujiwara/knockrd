@@ -1,11 +1,11 @@
 .PHONY: test run clean statik
 
+build: statik cmd/knockrd/* *.go go.mod go.sum
+	cd cmd/knockrd && go build
+
 statik: public/*
 	go get github.com/rakyll/statik
 	statik -src=./public
-
-build: cmd/knockrd/* *.go
-	cd cmd/knockrd && go build
 
 run: build
 	./cmd/knockrd/knockrd
