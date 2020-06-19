@@ -6,11 +6,14 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"os"
 	"path"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/wafv2"
 	mapset "github.com/deckarep/golang-set"
 	consul "github.com/hashicorp/consul/api"
@@ -20,9 +23,10 @@ import (
 var DefaultConsulKVPath = "knockrd/allowed"
 
 type streamer struct {
-	conf        *Config
-	svcRegional *wafv2.WAFV2
-	svcCF       *wafv2.WAFV2
+	conf          *Config
+	wafv2Regional *wafv2.WAFV2
+	wafv2CF       *wafv2.WAFV2
+	ec2           *ec2.EC2
 }
 
 // NewStreamHandler creates a DynamoDB Stream handler function
@@ -39,9 +43,10 @@ func NewStreamHandler(conf *Config) func(context.Context, events.DynamoDBEvent) 
 	}
 
 	s := &streamer{
-		conf:        conf,
-		svcRegional: wafv2.New(session.New(), awsCfgRegional),
-		svcCF:       wafv2.New(session.New(), awsCfgCF),
+		conf:          conf,
+		wafv2Regional: wafv2.New(session.New(), awsCfgRegional),
+		wafv2CF:       wafv2.New(session.New(), awsCfgCF),
+		ec2:           ec2.New(session.New(), awsCfgRegional),
 	}
 
 	return s.Handler
@@ -60,43 +65,55 @@ func (e ipSetEvent) CIDR() string {
 	return e.address + "/128"
 }
 
+func parseEventRecord(r events.DynamoDBEventRecord) *ipSetEvent {
+	key, ok := r.Change.Keys["Key"]
+	if !ok {
+		log.Printf("[warn] unkown key %v", r.Change.Keys)
+		return nil
+	}
+	ip := net.ParseIP(key.String())
+	if ip == nil {
+		log.Printf("[debug] ignore Key:%s", key.String())
+		return nil
+	}
+	log.Printf("[info] processing IP:%s Event:%s", ip.String(), r.EventName)
+	var add bool
+	if ipv4 := ip.To4(); ipv4 != nil {
+		switch r.EventName {
+		case "INSERT", "MODIFY":
+			add = true
+		case "REMOVE":
+		default:
+			log.Printf("[warn] unknown event %s", r.EventName)
+			return nil
+		}
+		log.Printf("[debug] IPV4 %s add %t", ip.String(), add)
+		return &ipSetEvent{ipv4.String(), add, true}
+	} else {
+		switch r.EventName {
+		case "INSERT", "MODIFY":
+			add = true
+		case "REMOVE":
+		default:
+			log.Printf("[warn] unknown event %s", r.EventName)
+			return nil
+		}
+		log.Printf("[debug] IPV6 %s add %t", ip.String(), add)
+		return &ipSetEvent{ip.String(), add, false}
+	}
+}
+
 func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) error {
 	var v4, v6 []ipSetEvent
 	for _, r := range event.Records {
-		key, ok := r.Change.Keys["Key"]
-		if !ok {
-			log.Printf("[warn] unkown key %v", r.Change.Keys)
+		ipsev := parseEventRecord(r)
+		if ipsev == nil {
 			continue
 		}
-		ip := net.ParseIP(key.String())
-		if ip == nil {
-			log.Printf("[debug] ignore Key:%s", key.String())
-			continue
-		}
-		log.Printf("[info] processing IP:%s Event:%s", ip.String(), r.EventName)
-		var add bool
-		if ipv4 := ip.To4(); ipv4 != nil {
-			switch r.EventName {
-			case "INSERT", "MODIFY":
-				add = true
-			case "REMOVE":
-			default:
-				log.Printf("[warn] unknown event %s", r.EventName)
-				continue
-			}
-			log.Printf("[debug] IPV4 %s add %t", ip.String(), add)
-			v4 = append(v4, ipSetEvent{ipv4.String(), add, true})
+		if ipsev.v4 {
+			v4 = append(v4, *ipsev)
 		} else {
-			switch r.EventName {
-			case "INSERT", "MODIFY":
-				add = true
-			case "REMOVE":
-			default:
-				log.Printf("[warn] unknown event %s", r.EventName)
-				continue
-			}
-			log.Printf("[debug] IPV6 %s add %t", ip.String(), add)
-			v6 = append(v6, ipSetEvent{ip.String(), add, false})
+			v6 = append(v6, *ipsev)
 		}
 	}
 	if s.conf.IPSet != nil {
@@ -112,6 +129,11 @@ func (s *streamer) Handler(ctx context.Context, event events.DynamoDBEvent) erro
 			return err
 		}
 	}
+	if len(s.conf.SecurityGroups) > 0 {
+		if err := s.updateSecurityGroup(s.conf.SecurityGroups, v4, v6); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -122,9 +144,9 @@ func (s *streamer) updateIPSet(c *IPSetConfig, events []ipSetEvent) error {
 	var svc *wafv2.WAFV2
 	switch c.Scope {
 	case "REGIONAL":
-		svc = s.svcRegional
+		svc = s.wafv2Regional
 	case "CLOUDFRONT":
-		svc = s.svcCF
+		svc = s.wafv2CF
 	default:
 		return fmt.Errorf("invalid scope %s: Set REGIONAL or CLOUDFRONT", c.Scope)
 	}
@@ -203,6 +225,77 @@ func (s *streamer) updateConsulKV(c *ConsulConfig, events ...[]ipSetEvent) error
 					return errors.Wrapf(err, "failed to delete from consul key=%s", key)
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func (s *streamer) updateSecurityGroup(groups []*SecurityGroupConfig, v4Events []ipSetEvent, v6Events []ipSetEvent) error {
+	description := aws.String(
+		fmt.Sprintf(
+			"by lambda function %s at %s",
+			os.Getenv("AWS_LAMBDA_FUNCTION_NAME"),
+			time.Now().Format(time.RFC3339),
+		),
+	)
+	for _, gc := range groups {
+		authorize := &ec2.IpPermission{
+			FromPort:   aws.Int64(gc.FromPort),
+			ToPort:     aws.Int64(gc.ToPort),
+			IpProtocol: aws.String(gc.Protocol),
+		}
+		revoke := &ec2.IpPermission{
+			FromPort:   aws.Int64(gc.FromPort),
+			ToPort:     aws.Int64(gc.ToPort),
+			IpProtocol: aws.String(gc.Protocol),
+		}
+		for _, ev := range v4Events {
+			if ev.add {
+				authorize.IpRanges = append(authorize.IpRanges, &ec2.IpRange{
+					CidrIp:      aws.String(ev.CIDR()),
+					Description: description,
+				})
+			} else {
+				revoke.IpRanges = append(revoke.IpRanges, &ec2.IpRange{
+					CidrIp:      aws.String(ev.CIDR()),
+					Description: description,
+				})
+			}
+		}
+		for _, ev := range v6Events {
+			if ev.add {
+				authorize.Ipv6Ranges = append(authorize.Ipv6Ranges, &ec2.Ipv6Range{
+					CidrIpv6:    aws.String(ev.CIDR()),
+					Description: description,
+				})
+			} else {
+				revoke.Ipv6Ranges = append(revoke.Ipv6Ranges, &ec2.Ipv6Range{
+					CidrIpv6:    aws.String(ev.CIDR()),
+					Description: description,
+				})
+			}
+		}
+		if len(authorize.IpRanges) > 0 || len(authorize.Ipv6Ranges) > 0 {
+			log.Printf("[debug] authorizing security group(%s) %s", gc.ID, JSONString(authorize))
+			_, err := s.ec2.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+				GroupId:       aws.String(gc.ID),
+				IpPermissions: []*ec2.IpPermission{authorize},
+			})
+			if err != nil {
+				errors.Wrapf(err, "failed to AuthorizeSecurityGroupIngress for %s", gc.ID)
+			}
+			log.Printf("[info] authorized security group(%s) %s", gc.ID, JSONString(authorize))
+		}
+		if len(revoke.IpRanges) > 0 || len(revoke.Ipv6Ranges) > 0 {
+			log.Printf("[debug] revoking security group(%s) %s", gc.ID, JSONString(revoke))
+			_, err := s.ec2.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
+				GroupId:       aws.String(gc.ID),
+				IpPermissions: []*ec2.IpPermission{revoke},
+			})
+			if err != nil {
+				errors.Wrapf(err, "failed to RevokeSecurityGroupIngress for %s", gc.ID)
+			}
+			log.Printf("[info] revoked security group(%s) %s", gc.ID, JSONString(revoke))
 		}
 	}
 	return nil
