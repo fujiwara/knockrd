@@ -21,6 +21,13 @@ jobs:
         uses: goreleaser/goreleaser-action@v1
         with:
           version: latest
-          args: release --rm-dist
+          args: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker login
+        run: docker login docker.pkg.github.com -u fujiwara -p ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        run: docker build -t docker.pkg.github.com/${{ github.repository }}/knockrd:$(git describe --tags) --file docker/Dockerfile .
+      - name: Push image to GitHub Registry
+        run: docker push docker.pkg.github.com/${{ github.repository }}/knockrd:$(git describe --tags)

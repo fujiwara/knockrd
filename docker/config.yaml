@@ -1,0 +1,3 @@
+port: {{ env "KNOCKRD_PORT" "9876"}}
+table_name: {{ env "KNOCKRD_TABLE_NAME" "knockrd" }}
+ttl: {{ env "KNOCKRD_TTL" "3600s" }}
