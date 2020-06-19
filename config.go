@@ -33,6 +33,7 @@ var DefaultRealIPFrom = []string{
 
 type Config struct {
 	Port                 int           `yaml:"port"`
+	ProxyProtocol        bool          `yaml:"proxy_protocol"`
 	TableName            string        `yaml:"table_name"`
 	RealIPFrom           []string      `yaml:"real_ip_from"`
 	RealIPFromCloudFront bool          `yaml:"real_ip_from_cloudfront"`
