@@ -10,3 +10,8 @@ ip-set:
     name: knockrd-cf-v6
     scope: CLOUDFRONT
 real_ip_from_cloudfront: true
+security_groups:
+  - id: sg-9f3628fb
+    from_port: 22
+    to_port: 22
+    protocol: tcp

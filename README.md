@@ -2,6 +2,10 @@
 
 HTTP knocker daemon.
 
+## Description
+
+knockrd is a daemon to allow access from restricted IP addresses works with nginx auth_request, AWS WAF v2, EC2 security groups or etc.
+
 ## Usage
 
 ```console
@@ -120,6 +124,55 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 
 ![](docs/knockrd-with-serverless.svg)
 
+## Usage with EC2 Security Group
+
+knockrd works with EC2 security groups, AWS Lambda and Amazon DynamoDB.
+
+Prepare an IAM Role for lambda functions. `arn:aws:iam::{your account ID}:role/knockrd_lambda`
+The role must have policies which allows actions as below.
+
+- ec2:AuthorizeSecurityGroupIngress
+- ec2:RevokeSecurityGroupIngress
+- dynamodb:DeleteItem
+- dynamodb:GetItem
+- dynamodb:PutItem
+- dynamodb:UpdateItem
+- dynamodb:DiscribeTable
+- dynamodb:DiscribeTimeToLive
+- dynamodb:CreateTable (* if a table in config is not exist)
+- dynamodb:UpdateTimeToLive (*)
+
+Prepare EC2 security groups.
+
+Prepare config.yaml for the security groups.
+
+```yaml
+table_name: knockrd  # DynamoDB table name
+ttl: 86400s
+security_groups:
+  - id: sg-xxxxxxxx # ID of Security Group
+    from_port: 22   # From port
+    to_port: 22     # To port
+    protocol: tcp   # IP protocol (tcp, udp, icmp or number)
+```
+
+Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda directory](https://github.com/fujiwara/knockrd/tree/master/lambda) with the IAM role and config.yaml. The example of lambda directory uses [lambroll](https://github.com/fujiwara/lambroll) for deployment.
+
+### Authorization Flow
+
+1. A user accesses to `/allow` provided by knockrd-http.
+   - This location must be protected by other methods like OAuth or etc.
+1. knockrd-http shows HTML form to allow access from the user's IP address.
+1. The user pushes the "Allow" button.
+1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
+    - knockrd-stream adds the address to security groups by events on the dynamodb stream.
+1. The user accesses to resources has the security groups.
+1. Security groups allows or denies the user's request based on rules.
+1. DynamoDB expires the item after TTL.
+    - knockrd-stream deletes address from security groups by events on the stream.
+
+![](docs/knockrd-with-sg.svg)
+
 ## Usage with Consul and consul-template
 
 knockrd works with [Consul](https://www.consul.io/), AWS Lambda and Amazon DynamoDB.
@@ -171,7 +224,7 @@ cache_ttl: TTL for knockrd in memory cache for allowed IP addresses
 aws:
   region: us-east-1  # AWS region of DynamoDB & Regional WAFv2 IP Set
   endpoint:          # AWS endpoints for debug
-ip_set:
+ip-set:
   v4:
     id: xxxx        # ID of WAFv2 IP Set for IPv4
     name: foo       # Name of WAFv2 IP Set
@@ -180,6 +233,11 @@ ip_set:
     id: xxxx        # ID of WAFv2 IP Set for IPv6
     name: foo       # Name of WAFv2 IP Set
     scope: REGIONAL # Scope of WAFv2 IP Set (REGIONAL or CLOUDFRONT)
+security_groups:
+  - id: sg-xxxxxxxx # ID of Security Group
+    from_port: 22   # From port
+    to_port: 22     # To port
+    protocol: tcp   # IP protocol (tcp, udp, icmp or number)
 cousul:
   address: 127.0.0.1:8500 # address of Consul agnet
   scheme: http            # scheme for access to consul agent

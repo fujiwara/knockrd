@@ -44,7 +44,8 @@ type Config struct {
 		V4 *IPSetConfig `yaml:"v4"`
 		V6 *IPSetConfig `yaml:"v6"`
 	} `yaml:"ip-set"`
-	Consul *ConsulConfig
+	Consul         *ConsulConfig          `yaml:"consul"`
+	SecurityGroups []*SecurityGroupConfig `yaml:"security_groups"`
 }
 
 type ConsulConfig struct {
@@ -63,6 +64,13 @@ type IPSetConfig struct {
 	ID    string `yaml:"id"`
 	Scope string `yaml:"scope"`
 	Name  string `yaml:"name"`
+}
+
+type SecurityGroupConfig struct {
+	ID       string `yaml:"id"`
+	FromPort int64  `yaml:"from_port"`
+	ToPort   int64  `yaml:"to_port"`
+	Protocol string `yaml:"protocol"`
 }
 
 func LoadConfig(path string) (*Config, error) {
