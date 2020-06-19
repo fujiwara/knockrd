@@ -166,7 +166,7 @@ Deploy two lambda functions, knockrd-http and knockrd-stream in [lambda director
 1. The user pushes the "Allow" button.
 1. knockrd-http store the IP address to the backend(DynamoDB) with TTL.
     - knockrd-stream adds the address to security groups by events on the dynamodb stream.
-1. The user accesses to resources has the security groups.
+1. The user accesses to resources which have the security groups.
 1. Security groups allows or denies the user's request based on rules.
 1. DynamoDB expires the item after TTL.
     - knockrd-stream deletes address from security groups by events on the stream.
