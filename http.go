@@ -21,7 +21,6 @@ var (
 	mux     = http.NewServeMux()
 	backend Backend
 	tmpl    = template.Must(template.New("view").Parse(`<!DOCTYPE html>
-<!DOCTYPE html>
 <html>
   <head>
 	<meta charset="utf-8">
