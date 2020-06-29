@@ -119,20 +119,16 @@ func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEve
 		// Allows RemoteAddr set by lambdaHandler.ServeHTTP()
 		c.RealIPFrom = append(c.RealIPFrom, "127.0.0.1/32")
 	}
-	var ipfroms []*net.IPNet
-	for _, cidr := range c.RealIPFrom {
-		_, ipnet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return nil, nil, err
-		}
-		ipfroms = append(ipfroms, ipnet)
+
+	for path, hf := range httpHandlerFuncs {
+		path, hf := path, hf
+		mux.HandleFunc(path, wrapHandlerFunc(hf, nil))
 	}
 
-	middleware := realip.MustMiddleware(&realip.Config{
-		RealIPFrom:      ipfroms,
-		RealIPHeader:    c.RealIPHeader,
-		RealIPRecursive: true,
-	})
+	middleware, err := c.createRealIPMiddleware()
+	if err != nil {
+		return nil, nil, err
+	}
 	hh := middleware(mux)
 	if onLambda {
 		hh = lambdaHandler{hh}
@@ -160,4 +156,21 @@ func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEve
 		}
 	}
 	return hh, sh, err
+}
+
+func (c *Config) createRealIPMiddleware() (func(http.Handler) http.Handler, error) {
+	var ipfroms []*net.IPNet
+	for _, cidr := range c.RealIPFrom {
+		_, ipnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return nil, err
+		}
+		ipfroms = append(ipfroms, ipnet)
+	}
+
+	return realip.Middleware(&realip.Config{
+		RealIPFrom:      ipfroms,
+		RealIPHeader:    c.RealIPHeader,
+		RealIPRecursive: true,
+	})
 }
