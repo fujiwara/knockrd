@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/fujiwara/go-amzn-oidc/validator"
 	"github.com/kayac/go-config"
 	"github.com/natureglobal/realip"
 )
@@ -32,16 +33,20 @@ var DefaultRealIPFrom = []string{
 }
 
 type Config struct {
-	Port                 int           `yaml:"port"`
-	ProxyProtocol        bool          `yaml:"proxy_protocol"`
-	TableName            string        `yaml:"table_name"`
-	RealIPFrom           []string      `yaml:"real_ip_from"`
-	RealIPFromCloudFront bool          `yaml:"real_ip_from_cloudfront"`
-	RealIPHeader         string        `yaml:"real_ip_header"`
-	TTL                  time.Duration `yaml:"ttl"`
-	CacheTTL             time.Duration `yaml:"cache_ttl"`
-	AWS                  AWSConfig     `yaml:"aws"`
-	IPSet                *struct {
+	Port          int    `yaml:"port"`
+	ProxyProtocol bool   `yaml:"proxy_protocol"`
+	TableName     string `yaml:"table_name"`
+
+	RealIPFrom           []string `yaml:"real_ip_from"`
+	RealIPFromCloudFront bool     `yaml:"real_ip_from_cloudfront"`
+	RealIPHeader         string   `yaml:"real_ip_header"`
+
+	OIDCAllowed *ConfigOIDCAllowed `yaml:"oidc_allowed"`
+
+	TTL      time.Duration `yaml:"ttl"`
+	CacheTTL time.Duration `yaml:"cache_ttl"`
+	AWS      AWSConfig     `yaml:"aws"`
+	IPSet    *struct {
 		V4 *IPSetConfig `yaml:"v4"`
 		V6 *IPSetConfig `yaml:"v6"`
 	} `yaml:"ip-set"`
@@ -72,6 +77,11 @@ type SecurityGroupConfig struct {
 	FromPort int64  `yaml:"from_port"`
 	ToPort   int64  `yaml:"to_port"`
 	Protocol string `yaml:"protocol"`
+}
+
+type ConfigOIDCAllowed struct {
+	EmailDomains   []string `yaml:"email_domains"`
+	EmailAddresses []string `yaml:"email_addresses"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -120,9 +130,14 @@ func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEve
 		c.RealIPFrom = append(c.RealIPFrom, "127.0.0.1/32")
 	}
 
+	allow := c.createAmznOIDCDataValidator()
 	for path, hf := range httpHandlerFuncs {
 		path, hf := path, hf
-		mux.HandleFunc(path, wrapHandlerFunc(hf, nil))
+		if path == "/allow" {
+			mux.HandleFunc(path, wrapHandlerFunc(hf, allow))
+		} else {
+			mux.HandleFunc(path, wrapHandlerFunc(hf, nil))
+		}
 	}
 
 	middleware, err := c.createRealIPMiddleware()
@@ -173,4 +188,46 @@ func (c *Config) createRealIPMiddleware() (func(http.Handler) http.Handler, erro
 		RealIPHeader:    c.RealIPHeader,
 		RealIPRecursive: true,
 	})
+}
+
+func (c *Config) createAmznOIDCDataValidator() allowFunc {
+	if c.OIDCAllowed == nil {
+		return nil
+	}
+	return func(r *http.Request) (bool, error) {
+		claims, err := validator.Validate(r.Header.Get("x-amzn-oidc-data"))
+		if err != nil {
+			log.Println("[warn] x-amzn-oidc-data validate failed", err)
+			return false, err
+		}
+		_email, ok := claims["email"]
+		if !ok {
+			log.Println("[warn] x-amzn-oidc-data claims have not a email field")
+			return false, nil
+		}
+		email, ok := _email.(string)
+		if !ok {
+			log.Println("[warn] x-amzn-oidc-data claims have not a string email field")
+			return false, nil
+		}
+		email = strings.ToLower(email)
+		for _, d := range c.OIDCAllowed.EmailDomains {
+			domain := strings.ToLower(d)
+			if !strings.HasPrefix(domain, "@") {
+				domain = "@" + d
+			}
+			if strings.HasSuffix(email, domain) {
+				log.Printf("[debug] email %s matched domain %s", email, domain)
+				return true, nil
+			}
+		}
+		for _, e := range c.OIDCAllowed.EmailAddresses {
+			if email == strings.ToLower(e) {
+				log.Printf("[debug] email %s included in emails", email)
+				return true, nil
+			}
+		}
+		log.Printf("[warn] email %s is not allowed", email)
+		return false, nil
+	}
 }
