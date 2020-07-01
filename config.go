@@ -84,6 +84,28 @@ type ConfigOIDCAllowed struct {
 	EmailAddresses []string `yaml:"email_addresses"`
 }
 
+func (c *ConfigOIDCAllowed) allow(email string) bool {
+	email = strings.ToLower(email)
+	for _, d := range c.EmailDomains {
+		domain := strings.ToLower(d)
+		if !strings.HasPrefix(domain, "@") {
+			domain = "@" + d
+		}
+		if strings.HasSuffix(email, domain) {
+			log.Printf("[debug] email %s matched domain %s", email, domain)
+			return true
+		}
+	}
+	for _, e := range c.EmailAddresses {
+		if email == strings.ToLower(e) {
+			log.Printf("[debug] email %s included in emails", email)
+			return true
+		}
+	}
+	log.Printf("[warn] email %s is not allowed", email)
+	return false
+}
+
 func LoadConfig(path string) (*Config, error) {
 	log.Println("[info] loading config file", path)
 	c := Config{
@@ -200,34 +222,11 @@ func (c *Config) createAmznOIDCDataValidator() allowFunc {
 			log.Println("[warn] x-amzn-oidc-data validate failed", err)
 			return false, err
 		}
-		_email, ok := claims["email"]
-		if !ok {
-			log.Println("[warn] x-amzn-oidc-data claims have not a email field")
+		email := claims.Email()
+		if email == "" {
+			log.Println("[warn] x-amzn-oidc-data claims have not a email")
 			return false, nil
 		}
-		email, ok := _email.(string)
-		if !ok {
-			log.Println("[warn] x-amzn-oidc-data claims have not a string email field")
-			return false, nil
-		}
-		email = strings.ToLower(email)
-		for _, d := range c.OIDCAllowed.EmailDomains {
-			domain := strings.ToLower(d)
-			if !strings.HasPrefix(domain, "@") {
-				domain = "@" + d
-			}
-			if strings.HasSuffix(email, domain) {
-				log.Printf("[debug] email %s matched domain %s", email, domain)
-				return true, nil
-			}
-		}
-		for _, e := range c.OIDCAllowed.EmailAddresses {
-			if email == strings.ToLower(e) {
-				log.Printf("[debug] email %s included in emails", email)
-				return true, nil
-			}
-		}
-		log.Printf("[warn] email %s is not allowed", email)
-		return false, nil
+		return c.OIDCAllowed.allow(email), nil
 	}
 }
