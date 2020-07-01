@@ -21,7 +21,6 @@ var (
 	mux     = http.NewServeMux()
 	backend Backend
 	tmpl    = template.Must(template.New("view").Parse(`<!DOCTYPE html>
-<!DOCTYPE html>
 <html>
   <head>
 	<meta charset="utf-8">
@@ -50,23 +49,41 @@ var (
 `))
 )
 
+var httpHandlerFuncs = make(map[string]handlerFunc)
+
 func init() {
 	statikFS, err := fs.New()
 	if err != nil {
 		panic(err)
 	}
-	mux.HandleFunc("/", wrap(rootHandler))
-	mux.HandleFunc("/allow", wrap(allowHandler))
-	mux.HandleFunc("/auth", wrap(authHandler))
+	httpHandlerFuncs["/"] = rootHandler
+	httpHandlerFuncs["/allow"] = allowHandler
+	httpHandlerFuncs["/auth"] = authHandler
 	mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(statikFS)))
 }
 
-type handler func(http.ResponseWriter, *http.Request) error
+type handlerFunc func(http.ResponseWriter, *http.Request) error
 
-func wrap(h handler) func(http.ResponseWriter, *http.Request) {
+type allowFunc func(r *http.Request) (bool, error)
+
+func wrapHandlerFunc(h handlerFunc, allow allowFunc) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("X-Frame-Options", "DENY")
 		w.Header().Set("Cache-Control", "private")
+
+		if allow != nil {
+			if ok, err := allow(r); err != nil {
+				log.Println("[error]", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintln(w, "Server Error")
+				return
+			} else if !ok {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprintln(w, "Forbidden")
+				return
+			}
+		}
+
 		err := h(w, r)
 		if err != nil {
 			log.Println("[error]", err)
