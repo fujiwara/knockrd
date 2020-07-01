@@ -72,14 +72,14 @@ func wrapHandlerFunc(h handlerFunc, allow allowFunc) func(http.ResponseWriter, *
 		w.Header().Set("Cache-Control", "private")
 
 		if allow != nil {
-			if ok, err := allow(r); !ok {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprintln(w, "Forbidden")
-				return
-			} else if err != nil {
+			if ok, err := allow(r); err != nil {
 				log.Println("[error]", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintln(w, "Server Error")
+				return
+			} else if !ok {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprintln(w, "Forbidden")
 				return
 			}
 		}
