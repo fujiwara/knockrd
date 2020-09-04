@@ -26,8 +26,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker login
-        run: docker login docker.pkg.github.com -u fujiwara -p ${{ secrets.GITHUB_TOKEN }}
+        run: docker login ghcr.io -u fujiwara -p ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
-        run: docker build -t docker.pkg.github.com/${{ github.repository }}/knockrd:$(git describe --tags) --file docker/Dockerfile .
+        run: docker build -t ghcr.io/fujiwara/knockrd:$(git describe --tags) --file docker/Dockerfile .
       - name: Push image to GitHub Registry
-        run: docker push docker.pkg.github.com/${{ github.repository }}/knockrd:$(git describe --tags)
+        run: docker push ghcr.io/fujiwara/knockrd:$(git describe --tags)
