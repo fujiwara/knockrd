@@ -6,30 +6,30 @@ jobs:
       matrix:
         go:
           - 1.14
+          - 1.15
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+        id: go
 
-    - name: Set up Go
-      uses: actions/setup-go@v1
-      with:
-        go-version: ${{ matrix.go }}
-      id: go
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      - name: Start dynamodb-local
+        run: |
+          docker run -d -p 8000:8000 amazon/dynamodb-local
 
-    - name: Start dynamodb-local
-      run: |
-        docker run -d -p 8000:8000 amazon/dynamodb-local
+      - name: Start consul-agent
+        run: |
+          docker run -d -p 8500:8500 consul:1.7 agent -server -data-dir /tmp/data -bootstrap -client 0.0.0.0
 
-    - name: Start consul-agent
-      run: |
-        docker run -d -p 8500:8500 consul:1.7 agent -server -data-dir /tmp/data -bootstrap -client 0.0.0.0
-
-    - name: Build & Test
-      run: |
-        PATH=$HOME/go/bin:$PATH make test
-      env:
-        AWS_ACCESS_KEY_ID: dummy
-        AWS_SECRET_ACCESS_KEY: dummy
+      - name: Build & Test
+        run: |
+          PATH=$HOME/go/bin:$PATH make test
+        env:
+          AWS_ACCESS_KEY_ID: dummy
+          AWS_SECRET_ACCESS_KEY: dummy
