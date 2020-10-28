@@ -146,7 +146,7 @@ func (c *Config) String() string {
 // Setup setups resources by config
 func (c *Config) Setup() (http.Handler, func(context.Context, events.DynamoDBEvent) error, error) {
 	log.Println("[info] setup")
-	onLambda := strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda_go")
+	onLambda := strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda_") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != ""
 	if onLambda {
 		// Allows RemoteAddr set by lambdaHandler.ServeHTTP()
 		c.RealIPFrom = append(c.RealIPFrom, "127.0.0.1/32")
