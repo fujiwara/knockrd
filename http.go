@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 
 	_ "github.com/fujiwara/knockrd/statik"
@@ -116,9 +117,29 @@ func allowHandler(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func getRealIPAddr(r *http.Request) (string, error) {
+	realip_header := r.Header.Get("X-Real-IP")
+	log.Printf("[debug] X-Real-IP: %s", realip_header)
+	if realip_header == "" {
+		return "", fmt.Errorf("X-Real-IP header not found")
+	}
+	// X-Real-IP may contain port number
+	// For example, ALB's setting routing.http.xff_client_port.enabled
+	ipaddr, _, err := net.SplitHostPort(realip_header)
+	if err != nil {
+		// missing port number
+		ipaddr = realip_header
+	}
+	if net.ParseIP(ipaddr) == nil {
+		return "", fmt.Errorf("invalid IP address: %s", ipaddr)
+	}
+	log.Printf("[debug] ipaddr: %s", ipaddr)
+	return ipaddr, nil
+}
+
 func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
-	ipaddr := r.Header.Get("X-Real-IP")
-	if ipaddr == "" {
+	ipaddr, err := getRealIPAddr(r)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, "Bad request")
 		return nil
@@ -137,7 +158,12 @@ func allowGetHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
-	ipaddr := r.Header.Get("X-Real-IP")
+	ipaddr, err := getRealIPAddr(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "Bad request")
+		return nil
+	}
 	token := r.FormValue("csrf_token")
 	if ipaddr == "" || token == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -184,7 +210,12 @@ func allowPostHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func authHandler(w http.ResponseWriter, r *http.Request) error {
-	ipaddr := r.Header.Get("X-Real-IP")
+	ipaddr, err := getRealIPAddr(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "Bad request")
+		return nil
+	}
 	if ok, err := backend.Get(ipaddr); err != nil {
 		return err
 	} else if !ok {
@@ -199,7 +230,13 @@ func authHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) error {
-	return render(w, View{IPAddr: r.Header.Get("X-Real-IP")})
+	ipaddr, err := getRealIPAddr(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "Bad request")
+		return nil
+	}
+	return render(w, View{IPAddr: ipaddr})
 }
 
 func csrfToken() (string, error) {
