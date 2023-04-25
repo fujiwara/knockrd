@@ -3,6 +3,8 @@ package knockrd_test
 import (
 	"crypto/md5"
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -11,6 +13,8 @@ import (
 
 var conf *knockrd.Config
 
+var doTestBackend, _ = strconv.ParseBool(os.Getenv("BACKEND_TEST"))
+
 func init() {
 	testing.Init()
 	var err error
@@ -18,12 +22,18 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	_, _, err = conf.Setup()
-	if err != nil {
-		panic(err)
+	if doTestBackend {
+		_, _, err = conf.Setup()
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 func TestDynamoDBBackend(t *testing.T) {
+	if !doTestBackend {
+		t.Skip("skip backend test")
+		return
+	}
 	dynamo, err := knockrd.NewDynamoDBBackend(conf)
 	if err != nil {
 		t.Error(err)
@@ -32,6 +42,10 @@ func TestDynamoDBBackend(t *testing.T) {
 }
 
 func TestDynamoDBBackendNoCache(t *testing.T) {
+	if !doTestBackend {
+		t.Skip("skip backend test")
+		return
+	}
 	dynamo, err := knockrd.NewDynamoDBBackend(conf)
 	if err != nil {
 		t.Error(err)
@@ -40,6 +54,10 @@ func TestDynamoDBBackendNoCache(t *testing.T) {
 }
 
 func TestCachedBackend(t *testing.T) {
+	if !doTestBackend {
+		t.Skip("skip backend test")
+		return
+	}
 	dynamo, err := knockrd.NewDynamoDBBackend(conf)
 	if err != nil {
 		t.Error(err)
@@ -52,6 +70,10 @@ func TestCachedBackend(t *testing.T) {
 }
 
 func TestCachedBackendNoCache(t *testing.T) {
+	if !doTestBackend {
+		t.Skip("skip backend test")
+		return
+	}
 	dynamo, err := knockrd.NewDynamoDBBackend(conf)
 	if err != nil {
 		t.Error(err)
