@@ -85,6 +85,10 @@ var dynamoDBStreamEventJSON = []byte(`
 `)
 
 func TestStream(t *testing.T) {
+	if !doTestBackend {
+		t.Skip("skip stream test")
+		return
+	}
 	handler := knockrd.NewStreamHandler(conf)
 	if handler == nil {
 		t.Error("faild to new stream handler")
